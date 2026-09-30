@@ -1,0 +1,35 @@
+{
+  "name": "ricerca-ramp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Non-custodial Stellar on/off-ramp infrastructure: one API over Stripe Crypto Onramp, SEP-24 anchors and MoonPay.",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "dev": "tsx watch src/main.ts",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "prisma migrate deploy",
+    "preflight": "tsx scripts/preflight.ts",
+    "anchor:check": "tsx scripts/check-anchor.ts",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "@stellar/stellar-sdk": "^17.2.0",
+    "fastify": "^5.12.5",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "prisma": "^6.19.3",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

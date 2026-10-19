@@ -1,0 +1,63 @@
+name: Deploy site
+
+# Deploys site/ to Vercel from GitHub Actions: production on every push to
+# main, a preview for every pull request. Vercel's own Git integration can't
+# connect a private organization repo on the Hobby plan, so this does it with
+# the Vercel CLI. Each run shows up in the repo's Deployments panel.
+#
+# Secrets: VERCEL_TOKEN (a Vercel access token), VERCEL_ORG_ID, VERCEL_PROJECT_ID.
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/site-deploy.yml"]
+  pull_request:
+    paths: ["site/**", ".github/workflows/site-deploy.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: site-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    name: Deploy to Vercel (${{ github.event_name == 'pull_request' && 'preview' || 'production' }})
+    # Pull requests from forks don't get secrets.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'Preview' || 'Production' }}
+      url: ${{ github.event_name == 'pull_request' && steps.deploy.outputs.url || 'https://userampart.vercel.app' }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      TARGET: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check secrets
+        run: |
+          for s in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!s}" ]; then echo "::error::Add the $s repository secret (Settings > Secrets and variables > Actions)."; exit 1; fi
+          done
+      - run: npm install --global vercel@64
+      - name: Pull project settings
+        run: vercel pull --yes --environment="$TARGET" --token="$VERCEL_TOKEN"
+      - name: Build
+        run: vercel build $([ "$TARGET" = production ] && echo --prod) --token="$VERCEL_TOKEN"
+      - name: Deploy
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt $([ "$TARGET" = production ] && echo --prod) --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $url" >> "$GITHUB_STEP_SUMMARY"

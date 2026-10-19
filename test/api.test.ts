@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildServer } from "../src/app";
 import { deliverDue, signPayload } from "../src/engine/outbound";
 import { reconcileOnce } from "../src/engine/reconciler";
+import { applyUpdate } from "../src/engine/sessions";
 import { encrypt, hmacHex } from "../src/lib/crypto";
 import { db } from "../src/lib/db";
 import { newApiKey } from "../src/lib/keys";
@@ -255,6 +256,21 @@ describe("sessions API", () => {
 });
 
 describe("reconciler", () => {
+  it("ignores a stale poll that would move a session backwards, but not a fresh one", async () => {
+    const { body } = await create({ direction: "ON", wallet_address: wallet().publicKey(), fiat_amount: 10 });
+    const asked = new Date(Date.now() - 5_000); // the provider was asked before the payment landed
+    await applyUpdate(body.id, { status: "PROCESSING", providerStatus: "paid" }, "submit", "wallet payment submitted");
+
+    const stale = await applyUpdate(body.id, { status: "AWAITING_PAYMENT", providerStatus: "waiting" }, "poll", "test", { observedAt: asked });
+    expect(stale.changed).toBe(false);
+    expect(stale.ignored).toMatch(/predates/);
+    expect(stale.session.status).toBe("PROCESSING");
+
+    // A poll asked after the last change may still move it back (e.g. an anchor needs more info).
+    const fresh = await applyUpdate(body.id, { status: "AWAITING_PAYMENT", providerStatus: "waiting" }, "poll", "test", { observedAt: new Date() });
+    expect(fresh.session.status).toBe("AWAITING_PAYMENT");
+  });
+
   it("expires an abandoned session after a last look at the provider", async () => {
     const { body } = await create({ direction: "ON", wallet_address: wallet().publicKey(), fiat_amount: 10 });
     await db().rampSession.update({ where: { id: body.id }, data: { expiresAt: new Date(Date.now() - 1000) } });

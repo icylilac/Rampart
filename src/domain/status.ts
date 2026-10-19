@@ -31,6 +31,11 @@ export type UpdateSource = "create" | "webhook" | "poll" | "submit" | "expire" |
  *   provider's current state and may: some providers genuinely step back
  *   (a SEP-24 anchor asking the user for more information).
  */
+/** True when `to` is earlier in the lifecycle than `from`. */
+export function isBackward(from: SessionStatus, to: SessionStatus): boolean {
+  return RANK[to] < RANK[from];
+}
+
 export function canTransition(from: SessionStatus, to: SessionStatus, source: UpdateSource): boolean {
   if (from === to) return false;
   if (TERMINAL.has(from)) return from === "COMPLETED" && to === "REFUNDED";

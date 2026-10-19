@@ -35,6 +35,18 @@ const baseSchema = z.object({
     .regex(/^S[A-Z2-7]{55}$/, "RECEIPTS_ATTESTER_SECRET must be a Stellar secret key (S...)")
     .optional(),
 
+  /**
+   * Requests per minute per API key, client secret or (without one) IP
+   * address. 0 turns rate limiting off. Health checks and provider webhooks
+   * are never limited.
+   */
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(0).default(300),
+  /** Set to "true" behind a reverse proxy so client IPs come from X-Forwarded-For. */
+  TRUST_PROXY: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+
   SESSION_TTL_MINUTES: z.coerce.number().int().positive().default(60),
   RECONCILE_INTERVAL_SECONDS: z.coerce.number().int().positive().default(30),
 

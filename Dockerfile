@@ -1,4 +1,4 @@
-# Ricerca Ramp service image: API (default) or worker (node dist/worker.js).
+# Rampart service image: API (default) or worker (node dist/worker.js).
 
 FROM node:22-bookworm-slim AS build
 WORKDIR /app

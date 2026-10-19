@@ -284,7 +284,8 @@ describe("outbound webhooks", () => {
   it("retries failed deliveries with backoff", async () => {
     const { body } = await create({ direction: "ON", wallet_address: wallet().publicKey(), fiat_amount: 10 });
     const failing = async () => new Response(null, { status: 500 });
-    await deliverDue(100, failing);
+    // Other test files' deliveries share this database; drain until this one is attempted.
+    while ((await deliverDue(100, failing)) > 0);
     const retried = await db().webhookDelivery.findFirstOrThrow({ where: { sessionId: body.id } });
     expect(retried.status).toBe("PENDING");
     expect(retried.attempts).toBe(1);

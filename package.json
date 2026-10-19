@@ -27,6 +27,7 @@
     "sdk:test": "npm test -w @ricerca/ramp"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^11.2.1",
     "@prisma/client": "^6.19.3",
     "@stellar/stellar-sdk": "^17.2.0",
     "fastify": "^5.12.5",
@@ -38,7 +39,10 @@
     "embedded-postgres": "^18.4.0-beta.17",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2"
   },
   "workspaces": [
     "packages/*"

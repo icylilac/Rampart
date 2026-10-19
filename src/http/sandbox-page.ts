@@ -12,7 +12,7 @@ export function sandboxCheckoutPage(sessionId: string): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ricerca Ramp sandbox</title>
+<title>Rampart sandbox</title>
 <style>
   :root { color-scheme: light dark; --bg:#f6f6f4; --card:#fff; --ink:#16171a; --mute:#6b6f76; --line:#e2e0da; }
   @media (prefers-color-scheme: dark) { :root { --bg:#111214; --card:#1a1c20; --ink:#eef0f4; --mute:#9aa0aa; --line:#2a2e36; } }

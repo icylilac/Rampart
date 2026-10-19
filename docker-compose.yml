@@ -1,17 +1,19 @@
-# Self-hosted Ricerca Ramp: Postgres, a one-off migration, the API and a worker.
+# Self-hosted Rampart: Postgres, a one-off migration, the API and a worker.
 #
 #   npm run setup                 # creates .env with a fresh ENCRYPTION_KEY
 #   docker compose up -d --build
 #   docker compose run --rm api node dist/cli/project-create.js --name "My app"
 #
 # DATABASE_URL below points at the bundled Postgres and overrides the one in .env.
+# Set POSTGRES_PASSWORD in .env to change the database password (the database
+# is only reachable inside this compose network).
 
 x-app: &app
   build: .
   image: ricerca-ramp:local
   env_file: .env
   environment:
-    DATABASE_URL: postgresql://ricerca:ricerca@db:5432/ricerca_ramp?schema=public
+    DATABASE_URL: postgresql://ricerca:${POSTGRES_PASSWORD:-ricerca}@db:5432/ricerca_ramp?schema=public
     NODE_ENV: production
     # The worker container runs the reconciler; keep it out of the API process.
     WORKER_IN_PROCESS: "false"
@@ -22,7 +24,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ricerca
-      POSTGRES_PASSWORD: ricerca
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ricerca}
       POSTGRES_DB: ricerca_ramp
     volumes:
       - pgdata:/var/lib/postgresql/data

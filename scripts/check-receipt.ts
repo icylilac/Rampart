@@ -25,7 +25,8 @@ async function main() {
   const receipt = await readReceipt(contractId, sessionId, net);
   if (!receipt) {
     console.log(`✗ No receipt for session ${sessionId} in ${contractId}.`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   console.log(`Status:       ${receipt.status}${receipt.refundTxHash ? ` (refund tx ${receipt.refundTxHash})` : ""}`);
   console.log(`Wallet:       ${receipt.wallet}`);
@@ -37,15 +38,16 @@ async function main() {
   const res = await fetch(`${net.horizon}/transactions/${receipt.txHash}`);
   if (res.status === 404) {
     console.log("✗ Horizon doesn't know the delivery transaction.");
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   if (!res.ok) throw new Error(`Horizon returned HTTP ${res.status}`);
   const tx = (await res.json()) as { successful: boolean; ledger: number };
   console.log(tx.successful ? `✓ Delivery transaction succeeded in ledger ${tx.ledger}.` : "✗ Delivery transaction failed on Stellar.");
-  process.exit(tx.successful ? 0 : 1);
+  process.exitCode = tx.successful ? 0 : 1;
 }
 
 main().catch((e) => {
   console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
+  process.exitCode = 1;
 });

@@ -1,7 +1,7 @@
 import { Prisma, type Direction, type Project, type Provider, type RampSession } from "@prisma/client";
 import { StrKey } from "@stellar/stellar-sdk";
 import { config } from "../config";
-import { canTransition, TERMINAL, type UpdateSource } from "../domain/status";
+import { canTransition, isBackward, TERMINAL, type UpdateSource } from "../domain/status";
 import { decrypt, encrypt } from "../lib/crypto";
 import { db } from "../lib/db";
 import { ApiError, badRequest, conflict, notFound } from "../lib/errors";
@@ -206,17 +206,29 @@ export type ApplyResult = { session: RampSession; changed: boolean; ignored?: st
  * transition rules (src/domain/status.ts), records the transition, and then
  * verifies deliveries and notifies the project.
  */
-export async function applyUpdate(sessionId: string, update: StatusUpdate, source: UpdateSource, detail?: string): Promise<ApplyResult> {
+export async function applyUpdate(
+  sessionId: string,
+  update: StatusUpdate,
+  source: UpdateSource,
+  detail?: string,
+  opts: { observedAt?: Date } = {},
+): Promise<ApplyResult> {
   const result = await db().$transaction(async (tx): Promise<ApplyResult> => {
     await tx.$queryRaw`SELECT id FROM ramp_sessions WHERE id = ${sessionId} FOR UPDATE`;
     const s = await tx.rampSession.findUniqueOrThrow({ where: { id: sessionId } });
 
     const statusChange = update.status !== s.status;
-    if (statusChange && !canTransition(s.status, update.status, source)) {
+    // A poll may move a session backwards (an anchor can ask for more info),
+    // but not with an answer older than the session's last change: e.g. the
+    // provider was asked just before the wallet's payment moved it forward.
+    const stale =
+      statusChange && source === "poll" && opts.observedAt !== undefined && s.updatedAt > opts.observedAt && isBackward(s.status, update.status);
+    if (statusChange && (stale || !canTransition(s.status, update.status, source))) {
       if (source === "poll") {
         await tx.rampSession.update({ where: { id: sessionId }, data: { lastPolledAt: new Date() } });
       }
-      return { session: s, changed: false, ignored: `${s.status} → ${update.status} is not allowed from a ${source}` };
+      const why = stale ? "the poll's answer predates the session's last change" : `it is not allowed from a ${source}`;
+      return { session: s, changed: false, ignored: `${s.status} → ${update.status} ignored: ${why}` };
     }
 
     const data: Prisma.RampSessionUpdateInput = { providerStatus: update.providerStatus };
@@ -355,11 +367,12 @@ export async function sessionEvents(session: RampSession) {
 
 /** Polls the provider now ("refresh"). */
 export async function refreshSession(session: RampSession): Promise<RampSession> {
+  const observedAt = new Date();
   const update = await providerFor(session.provider).poll(withSecrets(session));
   if (!update) {
     return db().rampSession.update({ where: { id: session.id }, data: { lastPolledAt: new Date() } });
   }
-  return (await applyUpdate(session.id, update, "poll", "refresh")).session;
+  return (await applyUpdate(session.id, update, "poll", "refresh", { observedAt })).session;
 }
 
 /** The wallet signed the anchor's SEP-10 challenge. */

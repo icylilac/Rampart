@@ -73,9 +73,16 @@ describe("SDK end to end (test mode)", () => {
       await new Promise((res) => setTimeout(res, 60));
     }
     const final = await done;
-
     expect(final.status).toBe("COMPLETED");
-    expect(final.onchain_verified).toBe(true);
+
+    // The runner stops at COMPLETED; the on-chain check is saved just after
+    // (onchain_verified is null until then), so wait for it.
+    let checked = final;
+    for (let i = 0; i < 40 && checked.onchain_verified === null; i++) {
+      await new Promise((res) => setTimeout(res, 50));
+      checked = await ramp.sessions.retrieve(created.id);
+    }
+    expect(checked.onchain_verified).toBe(true);
     expect(statuses).toContain("AWAITING_PAYMENT");
     expect(statuses).toContain("PROCESSING");
 

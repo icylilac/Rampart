@@ -24,9 +24,10 @@ export async function processSandboxSession(session: RampSession): Promise<RampS
   for (const hook of sandbox.dueWebhooks(ctx)) {
     await ingestEvent("SANDBOX", hook, { sandbox: true, event_id: hook.eventId, status: hook.update?.status });
   }
+  const observedAt = new Date();
   const fresh = await db().rampSession.findUniqueOrThrow({ where: { id: session.id } });
   const update = await sandbox.poll(withSecrets(fresh));
-  if (update) await applyUpdate(fresh.id, update, "poll", "sandbox");
+  if (update) await applyUpdate(fresh.id, update, "poll", "sandbox", { observedAt });
   return db().rampSession.findUniqueOrThrow({ where: { id: session.id } });
 }
 
@@ -44,8 +45,9 @@ async function pollOpenSessions(now: Date, log: Log) {
   });
   for (const s of due) {
     try {
+      const observedAt = new Date();
       const update = await providerFor(s.provider).poll(withSecrets(s));
-      if (update) await applyUpdate(s.id, update, "poll", "reconciler");
+      if (update) await applyUpdate(s.id, update, "poll", "reconciler", { observedAt });
       else await db().rampSession.update({ where: { id: s.id }, data: { lastPolledAt: new Date() } });
     } catch (e) {
       log(`poll ${s.id} failed`, e);
@@ -80,9 +82,10 @@ async function expireStale(now: Date, log: Log) {
   });
   for (const s of stale) {
     try {
+      const observedAt = new Date();
       const update = await providerFor(s.provider).poll(withSecrets(s)).catch(() => null);
       let current = s;
-      if (update) current = (await applyUpdate(s.id, update, "poll", "pre-expiry check")).session;
+      if (update) current = (await applyUpdate(s.id, update, "poll", "pre-expiry check", { observedAt })).session;
       if ((EXPIRABLE as readonly string[]).includes(current.status)) {
         await applyUpdate(
           s.id,

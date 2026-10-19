@@ -24,10 +24,33 @@ permissions:
   deployments: write
 
 jobs:
+  # Deploys need the Vercel secrets. Until they're added (or on pull requests
+  # from forks, which get no secrets) the deploy is skipped, not failed.
+  check:
+    name: Vercel secrets
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          missing=""
+          for s in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do [ -n "${!s}" ] || missing="$missing $s"; done
+          if [ -n "$missing" ]; then
+            echo "::warning::Site not deployed: add the repository secret(s)$missing (Settings > Secrets and variables > Actions)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
   deploy:
     name: Deploy to Vercel (${{ github.event_name == 'pull_request' && 'preview' || 'production' }})
-    # Pull requests from forks don't get secrets.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: check
+    if: needs.check.outputs.ready == 'true'
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event_name == 'pull_request' && 'Preview' || 'Production' }}
@@ -45,11 +68,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check secrets
-        run: |
-          for s in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
-            if [ -z "${!s}" ]; then echo "::error::Add the $s repository secret (Settings > Secrets and variables > Actions)."; exit 1; fi
-          done
       - run: npm install --global vercel@64
       - name: Pull project settings
         run: vercel pull --yes --environment="$TARGET" --token="$VERCEL_TOKEN"

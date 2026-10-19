@@ -48,7 +48,7 @@ jobs:
           fi
 
   deploy:
-    name: Deploy to Vercel (${{ github.event_name == 'pull_request' && 'preview' || 'production' }})
+    name: Deploy to Vercel
     needs: check
     if: needs.check.outputs.ready == 'true'
     runs-on: ubuntu-latest

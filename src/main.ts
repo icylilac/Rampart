@@ -1,33 +1,28 @@
-import Fastify from "fastify";
+import { buildServer } from "./app";
 import { config } from "./config";
-import { allProviders } from "./providers/registry";
-import { usdc } from "./stellar/network";
+import { startWorker } from "./engine/reconciler";
+
+export { buildServer };
 
 /**
- * Initial server: health and provider capabilities. The ramp session API
- * (sessions, webhooks, reconciler) is specified in the README and built on
- * the modules under src/.
+ * API server. By default it also runs the reconciler and webhook delivery;
+ * set WORKER_IN_PROCESS=false and run `npm run worker` to split them.
  */
-export function buildServer() {
-  const app = Fastify({ logger: config().NODE_ENV !== "test" });
-
-  app.get("/health", async () => ({ status: "ok", network: config().STELLAR_NETWORK }));
-
-  app.get("/v1/providers", async () => ({
-    network: config().STELLAR_NETWORK,
-    usdc: usdc(),
-    providers: allProviders().map((p) => p.capabilities()),
-  }));
-
-  return app;
-}
-
 if (require.main === module) {
   const cfg = config();
-  buildServer()
-    .listen({ port: cfg.PORT, host: "0.0.0.0" })
-    .catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
+  const app = buildServer();
+  const stopWorker = cfg.WORKER_IN_PROCESS ? startWorker() : null;
+
+  const shutdown = async () => {
+    await stopWorker?.();
+    await app.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+
+  app.listen({ port: cfg.PORT, host: "0.0.0.0" }).catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 }

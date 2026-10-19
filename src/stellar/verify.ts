@@ -8,6 +8,8 @@ export type OnchainCheck = {
   ledger?: number;
   deliveredAmount?: string;
   memo?: string | null;
+  /** True when the check was simulated by the sandbox, not read from Horizon. */
+  simulated?: boolean;
 };
 
 const matchesAsset = (op: HorizonOperation, asset: AssetRef) =>

@@ -1,5 +1,6 @@
 import type { Direction, Provider, RampSession, SessionStatus } from "@prisma/client";
 import type { AssetRef } from "../stellar/network";
+import type { OnchainCheck } from "../stellar/verify";
 
 /** What the end user or wallet must do next. Returned to the project as `next_action`. */
 export type NextAction =
@@ -30,6 +31,10 @@ export type CreateInput = {
   customerIp?: string;
   anchorDomain?: string;
   lang?: string;
+  /** Sandbox only: which scripted scenario to run. */
+  sandboxScenario?: string;
+  /** Sandbox only: the provider a test-mode session stands in for. */
+  simulating?: Provider | null;
 };
 
 /** A normalized view of the provider's state. Undefined fields mean "unchanged". */
@@ -76,6 +81,15 @@ export interface RampProvider {
   poll(session: SessionContext): Promise<StatusUpdate | null>;
   /** Verify and parse an inbound webhook. Throws on a bad signature. */
   parseWebhook?(rawBody: string, headers: Record<string, string | string[] | undefined>): ParsedWebhook | null;
+  /** Exchange a wallet-signed SEP-10 challenge for provider access (anchors). */
+  completeAuth?(session: SessionContext, signedXdr: string): Promise<StatusUpdate>;
+  /** Check and submit a wallet-signed payment the provider asked for (off-ramp). */
+  submitPayment?(session: SessionContext, signedXdr: string): Promise<StatusUpdate>;
+  /**
+   * Confirm the delivery on-chain. Real providers leave this undefined and the
+   * engine checks Horizon; the sandbox simulates it.
+   */
+  verify?(session: SessionContext): Promise<OnchainCheck>;
 }
 
 export class WebhookSignatureError extends Error {}

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const optional = z.string().trim().min(1).optional();
 
-export const configSchema = z.object({
+const baseSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(8080),
   DATABASE_URL: z.string().min(1),
@@ -17,6 +17,23 @@ export const configSchema = z.object({
   HORIZON_URL: z.string().url().optional(),
   /** USDC issuer override; defaults to Circle's issuer for the network. */
   USDC_ISSUER: optional,
+
+  /** Soroban RPC for the receipts contract; defaults to SDF's for the network. */
+  SOROBAN_RPC_URL: z.string().url().optional(),
+  /**
+   * On-chain receipts (contracts/ramp-receipts). When both are set, every
+   * verified live delivery is recorded in the contract by the attester key.
+   */
+  RECEIPTS_CONTRACT_ID: z
+    .string()
+    .trim()
+    .regex(/^C[A-Z2-7]{55}$/, "RECEIPTS_CONTRACT_ID must be a contract address (C...)")
+    .optional(),
+  RECEIPTS_ATTESTER_SECRET: z
+    .string()
+    .trim()
+    .regex(/^S[A-Z2-7]{55}$/, "RECEIPTS_ATTESTER_SECRET must be a Stellar secret key (S...)")
+    .optional(),
 
   SESSION_TTL_MINUTES: z.coerce.number().int().positive().default(60),
   RECONCILE_INTERVAL_SECONDS: z.coerce.number().int().positive().default(30),
@@ -37,12 +54,31 @@ export const configSchema = z.object({
   /** Comma-separated anchor home domains projects may use (SEP-1 / SEP-10 / SEP-24). */
   ANCHOR_DOMAINS: z.string().default("testanchor.stellar.org"),
 
-  /** Enables the MOCK provider (never in production). */
-  ENABLE_MOCK_PROVIDER: z
+  /**
+   * Test mode: rk_test_ keys run every session on the simulated SANDBOX
+   * provider. On by default, as in Stripe; set to "false" to turn test keys off.
+   */
+  SANDBOX_ENABLED: z
     .string()
     .optional()
-    .transform((v) => v === "true"),
+    .transform((v) => v !== "false"),
+  /** Seconds between simulated sandbox steps (CREATED → ... → COMPLETED). */
+  SANDBOX_STEP_SECONDS: z.coerce.number().positive().default(3),
+
+  /**
+   * Run the reconciler and webhook delivery inside the API process. Set to
+   * "false" when running `npm run worker` separately (e.g. docker-compose).
+   */
+  WORKER_IN_PROCESS: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false"),
 });
+
+export const configSchema = baseSchema.refine(
+  (c) => Boolean(c.RECEIPTS_CONTRACT_ID) === Boolean(c.RECEIPTS_ATTESTER_SECRET),
+  { message: "Set both RECEIPTS_CONTRACT_ID and RECEIPTS_ATTESTER_SECRET, or neither", path: ["RECEIPTS_CONTRACT_ID"] },
+);
 
 export type Config = z.infer<typeof configSchema>;
 
@@ -54,9 +90,6 @@ export function config(): Config {
     if (!parsed.success) {
       const issues = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
       throw new Error(`Invalid configuration:\n${issues}`);
-    }
-    if (parsed.data.NODE_ENV === "production" && parsed.data.ENABLE_MOCK_PROVIDER) {
-      throw new Error("ENABLE_MOCK_PROVIDER must not be set in production");
     }
     cached = parsed.data;
   }

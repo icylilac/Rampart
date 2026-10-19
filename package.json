@@ -17,19 +17,30 @@
     "db:migrate": "prisma migrate deploy",
     "preflight": "tsx scripts/preflight.ts",
     "anchor:check": "tsx scripts/check-anchor.ts",
-    "postinstall": "prisma generate"
+    "receipt:check": "tsx scripts/check-receipt.ts",
+    "postinstall": "prisma generate",
+    "worker": "node dist/worker.js",
+    "dev:worker": "tsx watch src/worker.ts",
+    "test": "vitest run",
+    "project:create": "tsx src/cli/project-create.ts",
+    "sdk:build": "npm run build -w @ricerca/ramp",
+    "sdk:test": "npm test -w @ricerca/ramp"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@stellar/stellar-sdk": "^17.2.0",
     "fastify": "^5.12.5",
+    "prisma": "^6.19.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
-    "prisma": "^6.19.3",
+    "embedded-postgres": "^18.4.0-beta.17",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }

@@ -419,6 +419,7 @@ erDiagram
 - **Secrets at rest.** SEP-10 tokens and project webhook secrets are AES-256-GCM encrypted (`ENCRYPTION_KEY`); API keys and session client secrets are stored as SHA-256 hashes.
 - **Scoped browser access.** A session's client secret can read that one session and submit wallet signatures for it, nothing else. An unknown secret and another session's id return the same 404.
 - **Test mode is isolated.** `rk_test_` keys only ever reach the sandbox, and live and test sessions are invisible to each other.
+- **Abuse limits.** Requests are rate-limited per API key, client secret or IP; return URLs must be https; responses carry `nosniff`, `no-referrer` and frame-deny headers, and the sandbox page a strict CSP.
 - **Signed URLs.** MoonPay widget URLs are signed server-side, so wallet addresses and amounts can't be tampered with.
 - **Receipts contract.** The attester key can only write receipts (no funds, no transfers). The admin adds and removes attesters, and changing the admin needs both the old and the new account's signature.
 
@@ -508,6 +509,8 @@ All settings are environment variables validated at startup ([`src/config.ts`](.
 | `SANDBOX_ENABLED`, `SANDBOX_STEP_SECONDS` | | Test mode on/off (default on) and the sandbox's step length |
 | `WORKER_IN_PROCESS` | | Run the reconciler inside the API (default `true`; `false` with a separate worker) |
 | `RECEIPTS_CONTRACT_ID`, `RECEIPTS_ATTESTER_SECRET` | for receipts | Record verified deliveries on-chain; set both or neither |
+| `RATE_LIMIT_PER_MINUTE` | | Requests per minute per API key, client secret or IP (default 300, `0` = off); health checks and provider webhooks are exempt |
+| `TRUST_PROXY` | | `true` behind a reverse proxy, so client IPs come from `X-Forwarded-For` |
 | `SOROBAN_RPC_URL` | | Soroban RPC override; defaults to SDF's testnet RPC (or a mainnet RPC on `PUBLIC`) |
 
 ## Repository layout

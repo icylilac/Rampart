@@ -85,7 +85,9 @@ describe("SDK end to end (test mode)", () => {
 
   it("webhooks the service sends verify with the SDK", async () => {
     const received: { body: string; sig: string }[] = [];
-    await deliverDue(200, async (_url, init) => {
+    // Other test files' projects share this database; check only this project's deliveries.
+    await deliverDue(200, async (url, init) => {
+      if (url !== "https://project.example/e2e") return new Response(null, { status: 204 });
       received.push({ body: String(init?.body), sig: String((init?.headers as Record<string, string>)["Ricerca-Signature"]) });
       return new Response(null, { status: 204 });
     });

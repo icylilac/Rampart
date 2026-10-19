@@ -15,6 +15,8 @@ export default defineConfig({
       STELLAR_NETWORK: "TESTNET",
       PUBLIC_BASE_URL: "http://localhost:8080",
       STRIPE_WEBHOOK_SECRET: "whsec_test_stripe",
+      // Off for the suite; test/security.test.ts turns it on.
+      RATE_LIMIT_PER_MINUTE: "0",
     },
   },
 });

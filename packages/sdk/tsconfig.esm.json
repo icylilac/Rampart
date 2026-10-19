@@ -1,0 +1,1 @@
+{ "extends": "./tsconfig.json", "compilerOptions": { "module": "ES2020", "moduleResolution": "Bundler", "outDir": "dist/esm" } }

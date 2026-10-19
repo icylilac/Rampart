@@ -331,6 +331,10 @@ function memoValue(tx: Transaction): { type: MemoType; value: string | null } {
   if (memo.type === "hash" || memo.type === "return") {
     return { type: memo.type, value: Buffer.from(memo.value as Buffer).toString("base64") };
   }
+  // A text memo parsed from XDR comes back as bytes, not a string.
+  if (memo.type === "text" && typeof memo.value !== "string") {
+    return { type: memo.type, value: Buffer.from(memo.value as Uint8Array).toString("utf8") };
+  }
   return { type: memo.type, value: String(memo.value) };
 }
 

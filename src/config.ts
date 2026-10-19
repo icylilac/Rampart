@@ -37,11 +37,25 @@ export const configSchema = z.object({
   /** Comma-separated anchor home domains projects may use (SEP-1 / SEP-10 / SEP-24). */
   ANCHOR_DOMAINS: z.string().default("testanchor.stellar.org"),
 
-  /** Enables the MOCK provider (never in production). */
-  ENABLE_MOCK_PROVIDER: z
+  /**
+   * Test mode: rk_test_ keys run every session on the simulated SANDBOX
+   * provider. On by default, as in Stripe; set to "false" to turn test keys off.
+   */
+  SANDBOX_ENABLED: z
     .string()
     .optional()
-    .transform((v) => v === "true"),
+    .transform((v) => v !== "false"),
+  /** Seconds between simulated sandbox steps (CREATED → ... → COMPLETED). */
+  SANDBOX_STEP_SECONDS: z.coerce.number().positive().default(3),
+
+  /**
+   * Run the reconciler and webhook delivery inside the API process. Set to
+   * "false" when running `npm run worker` separately (e.g. docker-compose).
+   */
+  WORKER_IN_PROCESS: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false"),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -54,9 +68,6 @@ export function config(): Config {
     if (!parsed.success) {
       const issues = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
       throw new Error(`Invalid configuration:\n${issues}`);
-    }
-    if (parsed.data.NODE_ENV === "production" && parsed.data.ENABLE_MOCK_PROVIDER) {
-      throw new Error("ENABLE_MOCK_PROVIDER must not be set in production");
     }
     cached = parsed.data;
   }

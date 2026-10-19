@@ -1,0 +1,60 @@
+# Self-hosted Ricerca Ramp: Postgres, a one-off migration, the API and a worker.
+#
+#   npm run setup                 # creates .env with a fresh ENCRYPTION_KEY
+#   docker compose up -d --build
+#   docker compose run --rm api node dist/cli/project-create.js --name "My app"
+#
+# DATABASE_URL below points at the bundled Postgres and overrides the one in .env.
+
+x-app: &app
+  build: .
+  image: ricerca-ramp:local
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql://ricerca:ricerca@db:5432/ricerca_ramp?schema=public
+    NODE_ENV: production
+    # The worker container runs the reconciler; keep it out of the API process.
+    WORKER_IN_PROCESS: "false"
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ricerca
+      POSTGRES_PASSWORD: ricerca
+      POSTGRES_DB: ricerca_ramp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ricerca -d ricerca_ramp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  migrate:
+    <<: *app
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: ["node", "dist/worker.js"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

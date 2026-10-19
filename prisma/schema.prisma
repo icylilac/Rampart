@@ -11,19 +11,39 @@ datasource db {
 
 /// A project (tenant) that integrates the ramp API.
 model Project {
-  id                String         @id @default(uuid())
-  name              String
-  /// SHA-256 of the API key; the key itself is shown once at creation.
-  apiKeyHash        String         @unique @map("api_key_hash")
-  apiKeyPrefix      String         @map("api_key_prefix")
-  webhookUrl        String?        @map("webhook_url")
+  id               String            @id @default(uuid())
+  name             String
+  webhookUrl       String?           @map("webhook_url")
   /// AES-256-GCM encrypted secret used to sign outbound webhooks.
-  webhookSecretEnc  String         @map("webhook_secret_enc")
-  createdAt         DateTime       @default(now()) @map("created_at")
-  sessions          RampSession[]
-  deliveries        WebhookDelivery[]
+  webhookSecretEnc String            @map("webhook_secret_enc")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  apiKeys          ApiKey[]
+  sessions         RampSession[]
+  deliveries       WebhookDelivery[]
 
   @@map("projects")
+}
+
+/// LIVE keys reach real providers; TEST keys only ever use the sandbox.
+enum ApiKeyMode {
+  LIVE
+  TEST
+}
+
+/// A project's API key (rk_live_... or rk_test_...). Only the SHA-256 is stored.
+model ApiKey {
+  id        String     @id @default(uuid())
+  projectId String     @map("project_id")
+  project   Project    @relation(fields: [projectId], references: [id])
+  mode      ApiKeyMode
+  keyHash   String     @unique @map("key_hash")
+  /// First characters of the key, to recognise it in logs and the dashboard.
+  prefix    String
+  createdAt DateTime   @default(now()) @map("created_at")
+  revokedAt DateTime?  @map("revoked_at")
+
+  @@index([projectId])
+  @@map("api_keys")
 }
 
 enum Direction {
@@ -35,7 +55,8 @@ enum Provider {
   STRIPE
   MOONPAY
   ANCHOR
-  MOCK
+  /// Simulated provider used by test-mode keys.
+  SANDBOX
 }
 
 /// Unified lifecycle shared by every provider (see src/domain/status.ts).
@@ -51,42 +72,47 @@ enum SessionStatus {
 }
 
 model RampSession {
-  id                 String        @id @default(uuid())
-  projectId          String        @map("project_id")
-  project            Project       @relation(fields: [projectId], references: [id])
-  direction          Direction
-  provider           Provider
-  status             SessionStatus @default(CREATED)
+  id                String              @id @default(uuid())
+  projectId         String              @map("project_id")
+  project           Project             @relation(fields: [projectId], references: [id])
+  /// false for sessions created with a test-mode key (sandbox only).
+  livemode          Boolean             @default(true)
+  direction         Direction
+  provider          Provider
+  status            SessionStatus       @default(CREATED)
   /// Raw status string from the provider, for debugging and support.
-  providerStatus     String?       @map("provider_status")
-  providerRef        String?       @map("provider_ref")
-  walletAddress      String        @map("wallet_address")
-  assetCode          String        @map("asset_code")
-  assetIssuer        String?       @map("asset_issuer")
-  fiatCurrency       String?       @map("fiat_currency")
-  fiatAmount         Decimal?      @map("fiat_amount") @db.Decimal(20, 2)
-  cryptoAmount       Decimal?      @map("crypto_amount") @db.Decimal(24, 7)
-  externalReference  String?       @map("external_reference")
-  anchorDomain       String?       @map("anchor_domain")
+  providerStatus    String?             @map("provider_status")
+  providerRef       String?             @map("provider_ref")
+  walletAddress     String              @map("wallet_address")
+  assetCode         String              @map("asset_code")
+  assetIssuer       String?             @map("asset_issuer")
+  fiatCurrency      String?             @map("fiat_currency")
+  fiatAmount        Decimal?            @map("fiat_amount") @db.Decimal(20, 2)
+  cryptoAmount      Decimal?            @map("crypto_amount") @db.Decimal(24, 7)
+  externalReference String?             @map("external_reference")
+  /// SHA-256 of the session's client secret (rcs_...), which a browser uses
+  /// to follow this one session without the project's API key.
+  clientSecretHash  String?             @unique @map("client_secret_hash")
+  anchorDomain      String?             @map("anchor_domain")
   /// Encrypted provider credentials scoped to this session (e.g. SEP-10 JWT).
-  secretsEnc         String?       @map("secrets_enc")
+  secretsEnc        String?             @map("secrets_enc")
   /// What the end user or wallet must do next (widget URL, XDR to sign, ...).
-  nextAction         Json?         @map("next_action")
-  stellarTxHash      String?       @map("stellar_tx_hash")
+  nextAction        Json?               @map("next_action")
+  stellarTxHash     String?             @map("stellar_tx_hash")
   /// Result of independently checking the delivery on Stellar.
-  onchainVerified    Boolean?      @map("onchain_verified")
-  onchainCheck       Json?         @map("onchain_check")
-  failureReason      String?       @map("failure_reason")
-  metadata           Json?
-  expiresAt          DateTime      @map("expires_at")
-  lastPolledAt       DateTime?     @map("last_polled_at")
-  completedAt        DateTime?     @map("completed_at")
-  createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime      @updatedAt @map("updated_at")
-  transitions        SessionTransition[]
-  events             ProviderEvent[]
+  onchainVerified   Boolean?            @map("onchain_verified")
+  onchainCheck      Json?               @map("onchain_check")
+  failureReason     String?             @map("failure_reason")
+  metadata          Json?
+  expiresAt         DateTime            @map("expires_at")
+  lastPolledAt      DateTime?           @map("last_polled_at")
+  completedAt       DateTime?           @map("completed_at")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  transitions       SessionTransition[]
+  events            ProviderEvent[]
 
-  @@unique([projectId, externalReference])
+  @@unique([projectId, livemode, externalReference])
   @@index([provider, providerRef])
   @@index([status, lastPolledAt])
   @@map("ramp_sessions")
@@ -109,14 +135,14 @@ model SessionTransition {
 
 /// Every inbound provider webhook, deduplicated by the provider's event id.
 model ProviderEvent {
-  id          String       @id @default(uuid())
-  provider    Provider
-  eventId     String       @map("event_id")
-  sessionId   String?      @map("session_id")
-  session     RampSession? @relation(fields: [sessionId], references: [id])
-  type        String
-  payload     Json
-  receivedAt  DateTime     @default(now()) @map("received_at")
+  id         String       @id @default(uuid())
+  provider   Provider
+  eventId    String       @map("event_id")
+  sessionId  String?      @map("session_id")
+  session    RampSession? @relation(fields: [sessionId], references: [id])
+  type       String
+  payload    Json
+  receivedAt DateTime     @default(now()) @map("received_at")
 
   @@unique([provider, eventId])
   @@map("provider_events")
@@ -130,19 +156,19 @@ enum DeliveryStatus {
 
 /// Outbound webhook to a project's backend, retried with backoff.
 model WebhookDelivery {
-  id            String         @id @default(uuid())
-  projectId     String         @map("project_id")
-  project       Project        @relation(fields: [projectId], references: [id])
-  sessionId     String         @map("session_id")
-  eventType     String         @map("event_type")
-  payload       Json
-  status        DeliveryStatus @default(PENDING)
-  attempts      Int            @default(0)
-  nextAttemptAt DateTime       @default(now()) @map("next_attempt_at")
-  lastStatusCode Int?          @map("last_status_code")
-  lastError     String?        @map("last_error")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  deliveredAt   DateTime?      @map("delivered_at")
+  id             String         @id @default(uuid())
+  projectId      String         @map("project_id")
+  project        Project        @relation(fields: [projectId], references: [id])
+  sessionId      String         @map("session_id")
+  eventType      String         @map("event_type")
+  payload        Json
+  status         DeliveryStatus @default(PENDING)
+  attempts       Int            @default(0)
+  nextAttemptAt  DateTime       @default(now()) @map("next_attempt_at")
+  lastStatusCode Int?           @map("last_status_code")
+  lastError      String?        @map("last_error")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  deliveredAt    DateTime?      @map("delivered_at")
 
   @@index([status, nextAttemptAt])
   @@map("webhook_deliveries")

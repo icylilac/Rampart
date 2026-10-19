@@ -4,6 +4,7 @@ import { db } from "../lib/db";
 import { provider as providerFor, sandbox } from "../providers/registry";
 import { ingestEvent } from "./inbound";
 import { deliverDue } from "./outbound";
+import { syncReceipts } from "./receipts";
 import { applyUpdate, verifySession, withSecrets } from "./sessions";
 
 const OPEN = ["CREATED", "AWAITING_USER", "AWAITING_PAYMENT", "PROCESSING"] as const;
@@ -123,6 +124,7 @@ export async function reconcileOnce(now = new Date(), log: Log = defaultLog): Pr
     ["poll", () => pollOpenSessions(now, log)],
     ["expire", () => expireStale(now, log)],
     ["verify", () => retryVerification(now, log)],
+    ["receipts", () => syncReceipts(log)],
     ["webhooks", () => deliverDue()],
   ];
   for (const [name, step] of steps) {

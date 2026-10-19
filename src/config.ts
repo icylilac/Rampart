@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const optional = z.string().trim().min(1).optional();
 
-export const configSchema = z.object({
+const baseSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(8080),
   DATABASE_URL: z.string().min(1),
@@ -17,6 +17,23 @@ export const configSchema = z.object({
   HORIZON_URL: z.string().url().optional(),
   /** USDC issuer override; defaults to Circle's issuer for the network. */
   USDC_ISSUER: optional,
+
+  /** Soroban RPC for the receipts contract; defaults to SDF's for the network. */
+  SOROBAN_RPC_URL: z.string().url().optional(),
+  /**
+   * On-chain receipts (contracts/ramp-receipts). When both are set, every
+   * verified live delivery is recorded in the contract by the attester key.
+   */
+  RECEIPTS_CONTRACT_ID: z
+    .string()
+    .trim()
+    .regex(/^C[A-Z2-7]{55}$/, "RECEIPTS_CONTRACT_ID must be a contract address (C...)")
+    .optional(),
+  RECEIPTS_ATTESTER_SECRET: z
+    .string()
+    .trim()
+    .regex(/^S[A-Z2-7]{55}$/, "RECEIPTS_ATTESTER_SECRET must be a Stellar secret key (S...)")
+    .optional(),
 
   SESSION_TTL_MINUTES: z.coerce.number().int().positive().default(60),
   RECONCILE_INTERVAL_SECONDS: z.coerce.number().int().positive().default(30),
@@ -57,6 +74,11 @@ export const configSchema = z.object({
     .optional()
     .transform((v) => v !== "false"),
 });
+
+export const configSchema = baseSchema.refine(
+  (c) => Boolean(c.RECEIPTS_CONTRACT_ID) === Boolean(c.RECEIPTS_ATTESTER_SECRET),
+  { message: "Set both RECEIPTS_CONTRACT_ID and RECEIPTS_ATTESTER_SECRET, or neither", path: ["RECEIPTS_CONTRACT_ID"] },
+);
 
 export type Config = z.infer<typeof configSchema>;
 

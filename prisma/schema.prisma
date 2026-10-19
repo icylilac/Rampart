@@ -102,6 +102,12 @@ model RampSession {
   /// Result of independently checking the delivery on Stellar.
   onchainVerified   Boolean?            @map("onchain_verified")
   onchainCheck      Json?               @map("onchain_check")
+  /// On-chain receipt in the ramp-receipts contract (live, verified deliveries).
+  receiptTxHash     String?             @map("receipt_tx_hash")
+  receiptRecordedAt DateTime?           @map("receipt_recorded_at")
+  receiptRefundedAt DateTime?           @map("receipt_refunded_at")
+  /// Why the receipt can't be recorded (e.g. the delivery tx backs another session).
+  receiptError      String?             @map("receipt_error")
   failureReason     String?             @map("failure_reason")
   metadata          Json?
   expiresAt         DateTime            @map("expires_at")

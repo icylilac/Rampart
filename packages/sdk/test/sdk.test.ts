@@ -25,6 +25,7 @@ function session(overrides: Partial<RampSession>): RampSession {
     stellar_tx_hash: null,
     onchain_verified: null,
     onchain_check: null,
+    receipt: null,
     failure_reason: null,
     expires_at: null,
     completed_at: null,

@@ -56,6 +56,38 @@ jobs:
           node -e "const m=require('@ricerca/ramp'); if(typeof m.RicercaRamp!=='function') process.exit(1)"
           node --input-type=module -e "const m=await import('@ricerca/ramp/browser'); if(typeof m.RampRunner!=='function') process.exit(1)"
 
+  contract:
+    name: Receipts contract (tests + WASM)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts
+      - run: cargo test
+      - name: Install Stellar CLI
+        env:
+          STELLAR_CLI_VERSION: "25.2.0"
+        run: |
+          set -euo pipefail
+          asset="stellar-cli-${STELLAR_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL "https://github.com/stellar/stellar-cli/releases/download/v${STELLAR_CLI_VERSION}/${asset}" -o /tmp/stellar-cli.tar.gz
+          tar -xzf /tmp/stellar-cli.tar.gz -C /tmp
+          sudo install -m 755 /tmp/stellar /usr/local/bin/stellar
+      - run: stellar contract build
+      - run: sha256sum target/wasm32v1-none/release/ramp_receipts.wasm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ramp-receipts-wasm
+          path: contracts/target/wasm32v1-none/release/ramp_receipts.wasm
+          if-no-files-found: error
+
   docker:
     name: Docker image builds
     runs-on: ubuntu-latest

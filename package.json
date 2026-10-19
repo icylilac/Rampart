@@ -17,6 +17,7 @@
     "db:migrate": "prisma migrate deploy",
     "preflight": "tsx scripts/preflight.ts",
     "anchor:check": "tsx scripts/check-anchor.ts",
+    "receipt:check": "tsx scripts/check-receipt.ts",
     "postinstall": "prisma generate",
     "worker": "node dist/worker.js",
     "dev:worker": "tsx watch src/worker.ts",

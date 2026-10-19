@@ -55,6 +55,21 @@ export type OnchainCheck = {
   simulated?: boolean;
 };
 
+/**
+ * A delivery's receipt in the ramp-receipts contract. Look it up on Stellar
+ * with the contract's `get(receipt_id)` to check it without trusting the service.
+ */
+export type OnchainReceipt = {
+  contract_id: string;
+  /** SHA-256 of the session id, hex: the key the contract stores it under. */
+  receipt_id: string;
+  status: "DELIVERED" | "REFUNDED";
+  /** The Stellar transaction that recorded it (null if another worker recorded it). */
+  tx_hash: string | null;
+  recorded_at: string | null;
+  refunded_at: string | null;
+};
+
 export type RampSession = {
   id: string;
   object: "ramp_session";
@@ -75,6 +90,8 @@ export type RampSession = {
   onchain_verified: boolean | null;
   onchain_check: OnchainCheck | null;
   failure_reason: string | null;
+  /** The delivery's on-chain receipt, once recorded (live sessions, when the service has receipts on). */
+  receipt: OnchainReceipt | null;
   sandbox?: { scenario: SandboxScenario; simulating: Provider | null };
   expires_at: string | null;
   completed_at: string | null;

@@ -1,6 +1,8 @@
 import type { Prisma, RampSession, SessionTransition } from "@prisma/client";
 import type { NextAction } from "../providers/types";
 import type { SandboxMeta } from "../providers/sandbox";
+import { config } from "../config";
+import { receiptId } from "../stellar/receipts";
 
 const dec = (v: Prisma.Decimal | null) => (v === null ? null : v.toString());
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
@@ -31,6 +33,7 @@ export function serializeSession(s: RampSession, opts: { clientSecret?: string }
     onchain_verified: s.onchainVerified,
     onchain_check: s.onchainCheck ?? null,
     failure_reason: s.failureReason,
+    receipt: serializeReceipt(s),
     sandbox: meta.sandbox
       ? { scenario: meta.sandbox.scenario, simulating: meta.sandbox.simulating ?? null }
       : undefined,
@@ -39,6 +42,23 @@ export function serializeSession(s: RampSession, opts: { clientSecret?: string }
     created_at: iso(s.createdAt),
     updated_at: iso(s.updatedAt),
     ...(opts.clientSecret ? { client_secret: opts.clientSecret } : {}),
+  };
+}
+
+/**
+ * Where to find the session's on-chain receipt (contracts/ramp-receipts):
+ * null until one is recorded, or when receipts aren't configured.
+ */
+function serializeReceipt(s: RampSession) {
+  const contractId = config().RECEIPTS_CONTRACT_ID;
+  if (!contractId || !s.receiptRecordedAt) return null;
+  return {
+    contract_id: contractId,
+    receipt_id: receiptId(s.id).toString("hex"),
+    status: s.receiptRefundedAt ? ("REFUNDED" as const) : ("DELIVERED" as const),
+    tx_hash: s.receiptTxHash,
+    recorded_at: iso(s.receiptRecordedAt),
+    refunded_at: iso(s.receiptRefundedAt),
   };
 }
 

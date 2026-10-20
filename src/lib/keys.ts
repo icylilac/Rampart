@@ -14,7 +14,7 @@ export function newClientSecret(): { secret: string; hash: string } {
   return { secret, hash: sha256Hex(secret) };
 }
 
-/** Secret a project uses to verify the webhooks Ricerca Ramp sends it. */
+/** Secret a project uses to verify the webhooks Rampart sends it. */
 export const newWebhookSecret = () => `whsec_${randomToken(32)}`;
 
 export const isApiKey = (v: string) => /^rk_(live|test)_[A-Za-z0-9_-]{20,}$/.test(v);

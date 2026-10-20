@@ -54,9 +54,9 @@ export const CODE: { tab: string; file: string; code: string }[] = [
   {
     tab: "Server",
     file: "server.ts",
-    code: `import { RicercaRamp } from "@ricerca/ramp";
+    code: `import { Rampart } from "@rampart/sdk";
 
-const ramp = new RicercaRamp(process.env.RAMP_KEY);
+const ramp = new Rampart(process.env.RAMP_KEY);
 
 const session = await ramp.sessions.create({
   direction: "ON",
@@ -71,7 +71,7 @@ return { id: session.id, secret: session.client_secret };`,
   {
     tab: "Browser",
     file: "checkout.ts",
-    code: `import { RampRunner, stellarWalletsKitSigner } from "@ricerca/ramp/browser";
+    code: `import { RampRunner, stellarWalletsKitSigner } from "@rampart/sdk/browser";
 
 const runner = new RampRunner({
   sessionId: id,
@@ -87,9 +87,9 @@ const final = await runner.start();`,
     tab: "Webhook",
     file: "webhook.ts",
     code: `app.post("/hooks/ramp", (req, res) => {
-  const event = RicercaRamp.webhooks.constructEvent(
+  const event = Rampart.webhooks.constructEvent(
     req.rawBody,
-    req.headers["ricerca-signature"],
+    req.headers["rampart-signature"],
     process.env.RAMP_WEBHOOK_SECRET,
   );
   const s = event.data.object;

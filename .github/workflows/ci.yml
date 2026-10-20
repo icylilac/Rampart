@@ -17,15 +17,15 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: ricerca
-          POSTGRES_PASSWORD: ricerca
-          POSTGRES_DB: ricerca_test
+          POSTGRES_USER: rampart
+          POSTGRES_PASSWORD: rampart
+          POSTGRES_DB: rampart_test
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U ricerca -d ricerca_test"
+          --health-cmd "pg_isready -U rampart -d rampart_test"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      TEST_DATABASE_URL: postgresql://ricerca:ricerca@localhost:5432/ricerca_test?schema=public
+      TEST_DATABASE_URL: postgresql://rampart:rampart@localhost:5432/rampart_test?schema=public
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,14 +47,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck -w @ricerca/ramp
+      - run: npm run typecheck -w @rampart/sdk
       - run: npm run sdk:test
       - run: npm run sdk:build
       - name: Both module formats load
         working-directory: packages/sdk
         run: |
-          node -e "const m=require('@ricerca/ramp'); if(typeof m.RicercaRamp!=='function') process.exit(1)"
-          node --input-type=module -e "const m=await import('@ricerca/ramp/browser'); if(typeof m.RampRunner!=='function') process.exit(1)"
+          node -e "const m=require('@rampart/sdk'); if(typeof m.Rampart!=='function') process.exit(1)"
+          node --input-type=module -e "const m=await import('@rampart/sdk/browser'); if(typeof m.RampRunner!=='function') process.exit(1)"
 
   contract:
     name: Receipts contract (tests + WASM)
@@ -109,12 +109,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t ricerca-ramp:ci .
+      - run: docker build -t rampart:ci .
       - name: Image starts and answers /health
         run: |
           docker run -d --name ramp -p 8080:8080 \
             -e DATABASE_URL=postgresql://unused@localhost/unused \
             -e ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))") \
-            -e WORKER_IN_PROCESS=false ricerca-ramp:ci
+            -e WORKER_IN_PROCESS=false rampart:ci
           for i in $(seq 1 30); do curl -fs localhost:8080/health && exit 0; sleep 1; done
           docker logs ramp; exit 1

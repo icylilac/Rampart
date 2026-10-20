@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { RampRunner, stellarWalletsKitSigner } from "../src/browser";
-import { RicercaError, RicercaRamp, RicercaSignatureError, type RampSession } from "../src/index";
+import { RampartError, Rampart, RampartSignatureError, type RampSession } from "../src/index";
 
 const sign = (secret: string, t: number, body: string) => `t=${t},v1=${createHmac("sha256", secret).update(`${t}.${body}`).digest("hex")}`;
 
@@ -35,16 +35,16 @@ function session(overrides: Partial<RampSession>): RampSession {
   };
 }
 
-describe("RicercaRamp (server)", () => {
+describe("Rampart (server)", () => {
   it("rejects anything that isn't a project key", () => {
-    expect(() => new RicercaRamp("rcs_abc")).toThrow(RicercaError);
-    expect(new RicercaRamp("rk_test_abc").livemode).toBe(false);
-    expect(new RicercaRamp("rk_live_abc").livemode).toBe(true);
+    expect(() => new Rampart("rcs_abc")).toThrow(RampartError);
+    expect(new Rampart("rk_test_abc").livemode).toBe(false);
+    expect(new Rampart("rk_live_abc").livemode).toBe(true);
   });
 
   it("sends the key and body, and surfaces API errors with their code", async () => {
     const calls: { url: string; init?: RequestInit }[] = [];
-    const ramp = new RicercaRamp("rk_test_key", {
+    const ramp = new Rampart("rk_test_key", {
       baseUrl: "https://ramp.example.com",
       fetch: async (url, init) => {
         calls.push({ url, init });
@@ -52,7 +52,7 @@ describe("RicercaRamp (server)", () => {
       },
     });
     const err = await ramp.sessions.create({ direction: "ON", wallet_address: "G", fiat_amount: 5 }).catch((e) => e);
-    expect(err).toBeInstanceOf(RicercaError);
+    expect(err).toBeInstanceOf(RampartError);
     expect(err.code).toBe("preflight_failed");
     expect(err.status).toBe(422);
     expect(calls).toHaveLength(1); // a create without external_reference is never retried
@@ -62,7 +62,7 @@ describe("RicercaRamp (server)", () => {
 
   it("retries safe requests on 503", async () => {
     let n = 0;
-    const ramp = new RicercaRamp("rk_test_key", {
+    const ramp = new Rampart("rk_test_key", {
       fetch: async () => (++n < 3 ? new Response("{}", { status: 503 }) : new Response(JSON.stringify(session({})), { status: 200 })),
     });
     expect((await ramp.sessions.retrieve("x")).id).toBe(session({}).id);
@@ -75,7 +75,7 @@ describe("RicercaRamp (server)", () => {
       { object: "list", data: [session({ id: "c" })], has_more: false },
     ];
     const seen: string[] = [];
-    const ramp = new RicercaRamp("rk_test_key", {
+    const ramp = new Rampart("rk_test_key", {
       fetch: async (url) => {
         seen.push(new URL(url).searchParams.get("starting_after") ?? "");
         return new Response(JSON.stringify(pages[seen.length - 1]), { status: 200 });
@@ -94,14 +94,14 @@ describe("webhooks.constructEvent", () => {
   const t = now / 1000;
 
   it("accepts a valid signature", () => {
-    expect(RicercaRamp.webhooks.constructEvent(body, sign("whsec_x", t, body), "whsec_x", 300, now).id).toBe("evt_1");
+    expect(Rampart.webhooks.constructEvent(body, sign("whsec_x", t, body), "whsec_x", 300, now).id).toBe("evt_1");
   });
 
   it("rejects a wrong secret, a changed body and an old timestamp", () => {
-    expect(() => RicercaRamp.webhooks.constructEvent(body, sign("whsec_y", t, body), "whsec_x", 300, now)).toThrow(RicercaSignatureError);
-    expect(() => RicercaRamp.webhooks.constructEvent(body + " ", sign("whsec_x", t, body), "whsec_x", 300, now)).toThrow(RicercaSignatureError);
-    expect(() => RicercaRamp.webhooks.constructEvent(body, sign("whsec_x", t - 600, body), "whsec_x", 300, now)).toThrow(RicercaSignatureError);
-    expect(() => RicercaRamp.webhooks.constructEvent(body, undefined, "whsec_x", 300, now)).toThrow(RicercaSignatureError);
+    expect(() => Rampart.webhooks.constructEvent(body, sign("whsec_y", t, body), "whsec_x", 300, now)).toThrow(RampartSignatureError);
+    expect(() => Rampart.webhooks.constructEvent(body + " ", sign("whsec_x", t, body), "whsec_x", 300, now)).toThrow(RampartSignatureError);
+    expect(() => Rampart.webhooks.constructEvent(body, sign("whsec_x", t - 600, body), "whsec_x", 300, now)).toThrow(RampartSignatureError);
+    expect(() => Rampart.webhooks.constructEvent(body, undefined, "whsec_x", 300, now)).toThrow(RampartSignatureError);
   });
 });
 

@@ -1,9 +1,9 @@
-import { RicercaError } from "./errors.js";
+import { RampartError } from "./errors.js";
 import { request, type FetchLike, type RequestOptions } from "./http.js";
 import { TERMINAL_STATUSES, type NextAction, type RampSession } from "./types.js";
 
 export * from "./types.js";
-export { RicercaError } from "./errors.js";
+export { RampartError } from "./errors.js";
 
 /** Signs a transaction XDR in the user's wallet and returns the signed XDR. */
 export type SignTransaction = (xdr: string, opts: { networkPassphrase: string }) => Promise<string>;
@@ -21,7 +21,7 @@ export type RampRunnerOptions = {
   sessionId: string;
   /** The session's client_secret (rcs_...), from your backend. Never your API key. */
   clientSecret: string;
-  /** Your Ricerca Ramp deployment. Defaults to http://localhost:8080. */
+  /** Your Rampart deployment. Defaults to http://localhost:8080. */
   baseUrl?: string;
   /** Needed for off-ramps and anchors (sign_payment, sign_sep10_challenge). See stellarWalletsKitSigner. */
   signTransaction?: SignTransaction;
@@ -130,11 +130,11 @@ export class RampRunner {
       case "open_url":
         if (this.options.openUrl) await this.options.openUrl(action.url, session);
         else if (typeof window !== "undefined") window.open(action.url, "_blank", "noopener,width=480,height=720");
-        else throw new RicercaError("No openUrl handler and no window to open the provider page.", "no_open_url_handler", 0);
+        else throw new RampartError("No openUrl handler and no window to open the provider page.", "no_open_url_handler", 0);
         return null;
       case "stripe_onramp":
         if (!this.options.stripe) {
-          throw new RicercaError("Pass `stripe` options to mount Stripe's onramp widget.", "no_stripe_options", 0);
+          throw new RampartError("Pass `stripe` options to mount Stripe's onramp widget.", "no_stripe_options", 0);
         }
         await mountStripeOnramp({ ...this.options.stripe, clientSecret: action.client_secret });
         return null;
@@ -153,7 +153,7 @@ export class RampRunner {
 
   private sign(xdr: string, networkPassphrase: string) {
     if (!this.options.signTransaction) {
-      throw new RicercaError("This session needs a wallet signature; pass signTransaction.", "no_signer", 0);
+      throw new RampartError("This session needs a wallet signature; pass signTransaction.", "no_signer", 0);
     }
     return this.options.signTransaction(xdr, { networkPassphrase });
   }
@@ -183,17 +183,17 @@ function loadScript(src: string): Promise<void> {
     s.src = src;
     s.async = true;
     s.onload = () => resolve();
-    s.onerror = () => reject(new RicercaError(`Could not load ${src}.`, "script_load_failed", 0));
+    s.onerror = () => reject(new RampartError(`Could not load ${src}.`, "script_load_failed", 0));
     document.head.appendChild(s);
   });
 }
 
 /** Loads Stripe's onramp scripts (once) and mounts the widget for a session. */
 export async function mountStripeOnramp(opts: StripeOnrampOptions & { clientSecret: string }) {
-  if (typeof window === "undefined") throw new RicercaError("Stripe's onramp widget needs a browser.", "no_window", 0);
+  if (typeof window === "undefined") throw new RampartError("Stripe's onramp widget needs a browser.", "no_window", 0);
   const w = window as unknown as { StripeOnramp?: StripeOnrampGlobal };
   if (!w.StripeOnramp) for (const src of opts.scriptUrls ?? DEFAULT_STRIPE_SCRIPTS) await loadScript(src);
-  if (!w.StripeOnramp) throw new RicercaError("Stripe's onramp script did not load.", "script_load_failed", 0);
+  if (!w.StripeOnramp) throw new RampartError("Stripe's onramp script did not load.", "script_load_failed", 0);
   const session = w.StripeOnramp(opts.publishableKey).createSession({ clientSecret: opts.clientSecret, appearance: opts.appearance });
   session.mount(opts.element);
   return session;

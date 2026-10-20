@@ -1,4 +1,4 @@
-import { RicercaError } from "./errors.js";
+import { RampartError } from "./errors.js";
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -28,7 +28,7 @@ export async function request<T>(
   for (const [k, v] of Object.entries(init.query ?? {})) if (v !== undefined) url.searchParams.set(k, String(v));
 
   const attempts = init.retry ? opts.maxRetries + 1 : 1;
-  let lastError: RicercaError | undefined;
+  let lastError: RampartError | undefined;
   for (let attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0) await sleep(Math.min(4000, 300 * 2 ** (attempt - 1)) * (0.5 + Math.random() / 2));
     let res: Response;
@@ -44,7 +44,7 @@ export async function request<T>(
         signal: AbortSignal.timeout(opts.timeoutMs),
       });
     } catch (e) {
-      lastError = new RicercaError(`Could not reach Ricerca Ramp: ${(e as Error).message}`, "network_error", 0);
+      lastError = new RampartError(`Could not reach Rampart: ${(e as Error).message}`, "network_error", 0);
       continue;
     }
 
@@ -53,7 +53,7 @@ export async function request<T>(
     if (res.ok) return json as T;
 
     const err = (json as { error?: { code?: string; message?: string; details?: unknown } } | null)?.error;
-    lastError = new RicercaError(err?.message ?? `HTTP ${res.status}`, err?.code ?? "http_error", res.status, err?.details);
+    lastError = new RampartError(err?.message ?? `HTTP ${res.status}`, err?.code ?? "http_error", res.status, err?.details);
     if (!RETRYABLE.has(res.status)) break;
   }
   throw lastError!;

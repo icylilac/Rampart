@@ -1,6 +1,6 @@
-/** An error returned by the Ricerca Ramp API, or a failure to reach it. */
-export class RicercaError extends Error {
-  readonly name = "RicercaError";
+/** An error returned by the Rampart API, or a failure to reach it. */
+export class RampartError extends Error {
+  readonly name = "RampartError";
   constructor(
     message: string,
     /** Stable machine-readable code, e.g. "preflight_failed", "idempotency_conflict". */
@@ -15,6 +15,6 @@ export class RicercaError extends Error {
 }
 
 /** A webhook whose signature or timestamp didn't check out. Respond 400. */
-export class RicercaSignatureError extends Error {
-  readonly name = "RicercaSignatureError";
+export class RampartSignatureError extends Error {
+  readonly name = "RampartSignatureError";
 }

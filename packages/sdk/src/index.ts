@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { RicercaError, RicercaSignatureError } from "./errors.js";
+import { RampartError, RampartSignatureError } from "./errors.js";
 import { request, type FetchLike, type RequestOptions } from "./http.js";
 import {
   TERMINAL_STATUSES,
@@ -17,11 +17,11 @@ import {
 } from "./types.js";
 
 export * from "./types.js";
-export { RicercaError, RicercaSignatureError } from "./errors.js";
+export { RampartError, RampartSignatureError } from "./errors.js";
 export type { FetchLike } from "./http.js";
 
-export type RicercaRampOptions = {
-  /** Your Ricerca Ramp deployment, e.g. https://ramp.example.com. Defaults to http://localhost:8080. */
+export type RampartOptions = {
+  /** Your Rampart deployment, e.g. https://ramp.example.com. Defaults to http://localhost:8080. */
   baseUrl?: string;
   fetch?: FetchLike;
   timeoutMs?: number;
@@ -33,17 +33,17 @@ export type RicercaRampOptions = {
  * (rk_live_... or rk_test_...); never ship the key to a browser. For the
  * browser, pass the session's `client_secret` to `RampRunner` instead.
  *
- *   const ramp = new RicercaRamp(process.env.RICERCA_KEY!, { baseUrl: "https://ramp.example.com" });
+ *   const ramp = new Rampart(process.env.RAMPART_KEY!, { baseUrl: "https://ramp.example.com" });
  *   const session = await ramp.sessions.create({ direction: "ON", provider: "STRIPE", wallet_address, fiat_amount: 50 });
  */
-export class RicercaRamp {
+export class Rampart {
   /** true for rk_live_ keys, false for rk_test_ (sandbox) keys. */
   readonly livemode: boolean;
   private readonly opts: RequestOptions;
 
-  constructor(apiKey: string, options: RicercaRampOptions = {}) {
+  constructor(apiKey: string, options: RampartOptions = {}) {
     if (!/^rk_(live|test)_/.test(apiKey)) {
-      throw new RicercaError("Expected a project API key starting with rk_live_ or rk_test_.", "invalid_api_key", 0);
+      throw new RampartError("Expected a project API key starting with rk_live_ or rk_test_.", "invalid_api_key", 0);
     }
     this.livemode = apiKey.startsWith("rk_live_");
     this.opts = {
@@ -106,7 +106,7 @@ export class RicercaRamp {
       for (;;) {
         const s = await this.sessions.retrieve(id);
         if (statuses.includes(s.status)) return s;
-        if (Date.now() > deadline) throw new RicercaError(`Session ${id} is still ${s.status}.`, "wait_timeout", 0);
+        if (Date.now() > deadline) throw new RampartError(`Session ${id} is still ${s.status}.`, "wait_timeout", 0);
         await new Promise((r) => setTimeout(r, options.intervalMs ?? 2000));
       }
     },
@@ -137,15 +137,15 @@ export class RicercaRamp {
         const r = await this.sandbox.advance(id);
         if (!r.advanced) return r;
       }
-      throw new RicercaError(`Sandbox session ${id} did not settle in ${maxSteps} steps.`, "sandbox_not_settled", 0);
+      throw new RampartError(`Sandbox session ${id} did not settle in ${maxSteps} steps.`, "sandbox_not_settled", 0);
     },
   };
 
-  /** Verify webhooks Ricerca Ramp sends you. */
+  /** Verify webhooks Rampart sends you. */
   static readonly webhooks = {
     /**
-     * Checks the `Ricerca-Signature` header against the raw request body and
-     * returns the parsed event. Throws RicercaSignatureError if it doesn't
+     * Checks the `Rampart-Signature` header against the raw request body and
+     * returns the parsed event. Throws RampartSignatureError if it doesn't
      * match or is older than `toleranceSeconds`. Pass the raw body string,
      * not re-serialized JSON.
      */
@@ -158,16 +158,16 @@ export class RicercaRamp {
       }
       const t = parts.get("t")?.[0];
       const signatures = parts.get("v1") ?? [];
-      if (!t || signatures.length === 0) throw new RicercaSignatureError("Missing Ricerca-Signature header.");
+      if (!t || signatures.length === 0) throw new RampartSignatureError("Missing Rampart-Signature header.");
       if (!/^\d+$/.test(t) || Math.abs(now / 1000 - Number(t)) > toleranceSeconds) {
-        throw new RicercaSignatureError("Webhook timestamp is outside the tolerance window.");
+        throw new RampartSignatureError("Webhook timestamp is outside the tolerance window.");
       }
       const expected = Buffer.from(createHmac("sha256", secret).update(`${t}.${body}`).digest("hex"));
       const ok = signatures.some((s) => {
         const given = Buffer.from(s);
         return given.length === expected.length && timingSafeEqual(given, expected);
       });
-      if (!ok) throw new RicercaSignatureError("Webhook signature does not match.");
+      if (!ok) throw new RampartSignatureError("Webhook signature does not match.");
       return JSON.parse(body) as WebhookEvent;
     },
   };

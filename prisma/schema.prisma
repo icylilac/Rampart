@@ -1,4 +1,4 @@
-// Ricerca Ramp data model (PostgreSQL).
+// Rampart data model (PostgreSQL).
 
 generator client {
   provider = "prisma-client-js"

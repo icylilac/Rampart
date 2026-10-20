@@ -85,7 +85,7 @@ export class StripeProvider implements RampProvider {
     if (input.fiatAmount !== undefined) form.set("source_amount", input.fiatAmount.toFixed(2));
     else if (input.cryptoAmount !== undefined) form.set("destination_amount", String(input.cryptoAmount));
     if (input.customerIp) form.set("customer_ip_address", input.customerIp);
-    form.set("metadata[ricerca_session_id]", input.sessionId);
+    form.set("metadata[rampart_session_id]", input.sessionId);
 
     const session = await this.call("POST", "/crypto/onramp_sessions", form);
     return {

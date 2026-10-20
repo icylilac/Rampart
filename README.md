@@ -59,9 +59,9 @@ npm run dev                                    # http://localhost:8080
 Or with Docker: `docker compose up -d --build`.
 
 ```ts
-import { RicercaRamp } from "@ricerca/ramp";
+import { Rampart } from "@rampart/sdk";
 
-const ramp = new RicercaRamp("rk_test_...", { baseUrl: "http://localhost:8080" });
+const ramp = new Rampart("rk_test_...", { baseUrl: "http://localhost:8080" });
 const session = await ramp.sessions.create({
   direction: "ON",
   wallet_address: "G...",
@@ -83,7 +83,7 @@ const session = await ramp.sessions.create({
 | Path | What |
 |---|---|
 | `src/` | API, session engine, reconciler, provider adapters, Stellar checks |
-| `packages/sdk/` | `@ricerca/ramp` TypeScript SDK ([docs](packages/sdk/README.md)) |
+| `packages/sdk/` | `@rampart/sdk` TypeScript SDK ([docs](packages/sdk/README.md)) |
 | `contracts/ramp-receipts/` | Soroban receipts contract ([docs](contracts/README.md)) |
 | `site/` | Website (React + Vite): `cd site && npm install && npm run dev` |
 | `docs/reference.md` | Full reference: API, flows, statuses, data model, security, config |

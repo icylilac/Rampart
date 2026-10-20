@@ -7,3 +7,6 @@ dist/
 .DS_Store
 contracts/target/
 contracts/**/test_snapshots/
+.vercel
+public/
+dist-vercel/

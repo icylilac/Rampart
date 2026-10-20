@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "public",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- src prisma api scripts/vercel-build.sh vercel.json package.json package-lock.json",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
+  "regions": ["iad1"],
+  "functions": { "api/index.js": { "maxDuration": 30 } }
+}

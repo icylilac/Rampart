@@ -1,0 +1,10 @@
+# The API deploy only needs the service: src/, api/, prisma/ and package files.
+site
+contracts
+packages/sdk/dist
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log

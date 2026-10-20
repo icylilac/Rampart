@@ -19,6 +19,7 @@
     "anchor:check": "tsx scripts/check-anchor.ts",
     "receipt:check": "tsx scripts/check-receipt.ts",
     "postinstall": "prisma generate",
+    "vercel-build": "sh scripts/vercel-build.sh",
     "worker": "node dist/worker.js",
     "dev:worker": "tsx watch src/worker.ts",
     "test": "vitest run",
@@ -37,6 +38,7 @@
   "devDependencies": {
     "@types/node": "^22.20.4",
     "embedded-postgres": "^18.4.0-beta.17",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^4.1.12"

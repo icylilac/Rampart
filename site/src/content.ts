@@ -18,36 +18,12 @@ export const SESSION_LOG: LogLine[] = [
 
 /** Failures ramps hit in production, and what Rampart does about each. */
 export const FAILURES: { problem: string; impact: string; fix: string }[] = [
-  {
-    problem: "No USDC trustline",
-    impact: "The user pays by card, then the USDC can't be delivered.",
-    fix: "Checked before payment, with the trustline transaction ready to sign.",
-  },
-  {
-    problem: "Wrong or missing memo",
-    impact: "Off-ramp funds land in the anchor's pool with no owner.",
-    fix: "Rampart builds the exact payment and refuses a signed one that differs.",
-  },
-  {
-    problem: "Lost webhook",
-    impact: "The session sits on “pending” forever.",
-    fix: "A reconciler polls every open session; the provider's state wins.",
-  },
-  {
-    problem: "Webhooks out of order",
-    impact: "A late “pending” overwrites “completed”.",
-    fix: "One state machine. Sessions never move backwards.",
-  },
-  {
-    problem: "“Completed”, nothing arrived",
-    impact: "The provider says done; the wallet disagrees.",
-    fix: "Each delivery is checked on Stellar: tx, wallet, asset, amount, memo.",
-  },
-  {
-    problem: "Five status vocabularies",
-    impact: "Every project maps provider statuses by hand.",
-    fix: "Stripe, MoonPay and SEP-24 map to one lifecycle.",
-  },
+  { problem: "Missing trustline", impact: "Card charged, USDC undeliverable.", fix: "Checked before payment." },
+  { problem: "Wrong memo", impact: "Off-ramp funds land unassigned.", fix: "Exact payment built and enforced." },
+  { problem: "Lost webhook", impact: "Sessions stuck on pending.", fix: "Every open session reconciled." },
+  { problem: "Out-of-order events", impact: "Stale updates overwrite final ones.", fix: "Forward-only state machine." },
+  { problem: "Unverified completion", impact: "Provider says done, wallet disagrees.", fix: "Every delivery checked on Stellar." },
+  { problem: "Fragmented statuses", impact: "Each provider, its own vocabulary.", fix: "One lifecycle across providers." },
 ];
 
 export const CODE: { tab: string; file: string; code: string }[] = [
@@ -102,7 +78,7 @@ const final = await runner.start();`,
 ];
 
 export const PROVIDERS = [
-  { name: "Stripe Crypto Onramp", detail: "Card to USDC or XLM", region: "US · EU", dirs: "On" },
-  { name: "MoonPay", detail: "Buy and sell USDC and XLM", region: "Global", dirs: "On · Off" },
+  { name: "Stripe", detail: "Card to USDC and XLM", region: "US · EU", dirs: "On" },
+  { name: "MoonPay", detail: "Cards and bank transfers", region: "Global", dirs: "On · Off" },
   { name: "SEP-24 anchors", detail: "Local bank rails", region: "Per anchor", dirs: "On · Off" },
 ];

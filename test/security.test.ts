@@ -14,6 +14,7 @@ describe("hardening", () => {
 
   beforeAll(async () => {
     process.env.RATE_LIMIT_PER_MINUTE = "8";
+    process.env.AUTH_RATE_LIMIT_PER_MINUTE = "3";
     resetConfig();
     app = buildServer();
     await app.ready();
@@ -30,8 +31,20 @@ describe("hardening", () => {
 
   afterAll(async () => {
     process.env.RATE_LIMIT_PER_MINUTE = "0";
+    process.env.AUTH_RATE_LIMIT_PER_MINUTE = "0";
     resetConfig();
     await app.close();
+  });
+
+  it("limits sign-in attempts per IP more tightly than the API", async () => {
+    const attempt = () =>
+      app.inject({ method: "POST", url: "/v1/auth/login", remoteAddress: "203.0.113.9", payload: { email: "guess@example.com", password: "guess guess guess" } });
+    const codes = [];
+    for (let i = 0; i < 4; i++) codes.push((await attempt()).statusCode);
+    expect(codes).toEqual([401, 401, 401, 429]);
+    // Another IP still gets its own attempts.
+    const other = await app.inject({ method: "POST", url: "/v1/auth/login", remoteAddress: "203.0.113.10", payload: { email: "x@example.com", password: "guess guess guess" } });
+    expect(other.statusCode).toBe(401);
   });
 
   it("rate-limits per key, separately from other callers, but never health checks", async () => {

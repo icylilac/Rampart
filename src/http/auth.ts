@@ -1,9 +1,10 @@
-import type { RampSession } from "@prisma/client";
+import type { RampSession, User } from "@prisma/client";
 import type { FastifyRequest } from "fastify";
 import { sha256Hex } from "../lib/crypto";
 import { db } from "../lib/db";
 import { ApiError, notFound, unauthorized } from "../lib/errors";
 import { isApiKey, isClientSecret } from "../lib/keys";
+import { userForToken } from "../engine/accounts";
 import type { Caller } from "../engine/sessions";
 
 function bearer(request: FastifyRequest): string | null {
@@ -37,4 +38,11 @@ export async function requireClientSecret(request: FastifyRequest, sessionId: st
   // Same error for "wrong secret" and "wrong session": never reveal which sessions exist.
   if (!session || session.id !== sessionId) throw notFound("Session");
   return session;
+}
+
+/** A signed-in dashboard user (rds_... session token). */
+export async function requireUser(request: FastifyRequest): Promise<{ user: User; sessionId: string }> {
+  const token = bearer(request);
+  if (!token) throw unauthorized("Sign in to continue.");
+  return userForToken(token);
 }

@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
+import { LoginPage, SignupPage } from "./components/Auth";
 import { CodeTabs } from "./components/CodeTabs";
+import { DashboardPage } from "./components/Dashboard";
 import { Icon } from "./components/Icon";
 import { RampVisual } from "./components/RampVisual";
 import { SessionLog } from "./components/SessionLog";
 import { CONTRACT, CONTRACT_URL, FAILURES, GITHUB, PROVIDERS } from "./content";
+import { getToken } from "./lib/api";
+import { Link, navigate, safeNext, useLocation } from "./lib/router";
 
 const DOCS = `${GITHUB}/blob/main/docs/reference.md`;
 const NAV = [
@@ -23,7 +27,36 @@ const STRIP = [
   { name: "Freighter", note: "Wallets" },
 ];
 
+const TITLES: Record<string, string> = {
+  "/login": "Sign in · Rampart",
+  "/signup": "Create account · Rampart",
+  "/dashboard": "Dashboard · Rampart",
+};
+
+/** Routes: the landing page, sign-in, sign-up and the dashboard. */
 export function App() {
+  const { path, search } = useLocation();
+  const signedIn = Boolean(getToken());
+  const next = safeNext(search.get("next"));
+  // Signed-in users skip the auth pages; signed-out users can't open the dashboard.
+  const redirect =
+    (path === "/login" || path === "/signup") && signedIn ? next : path === "/dashboard" && !signedIn ? "/login?next=/dashboard" : null;
+
+  useEffect(() => {
+    if (redirect) navigate(redirect, { replace: true });
+  }, [redirect]);
+  useEffect(() => {
+    document.title = TITLES[path] ?? "Rampart: fiat ramps for Stellar, verified on-chain";
+  }, [path]);
+
+  if (redirect) return null;
+  if (path === "/login") return <LoginPage next={next} notice={search.has("expired") ? "Your session ended. Sign in again." : undefined} />;
+  if (path === "/signup") return <SignupPage next={next} />;
+  if (path === "/dashboard") return <DashboardPage />;
+  return <Home signedIn={signedIn} />;
+}
+
+function Home({ signedIn }: { signedIn: boolean }) {
   const [menu, setMenu] = useState(false);
   useEffect(() => {
     const close = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
@@ -52,6 +85,9 @@ export function App() {
             <a className="btn btn-outline hide-sm" href={DOCS} target="_blank" rel="noreferrer">
               Docs
             </a>
+            <Link className="btn btn-outline hide-sm" to={signedIn ? "/dashboard" : "/login"}>
+              {signedIn ? "Dashboard" : "Sign in"}
+            </Link>
             <a className="btn btn-solid hide-sm" href="#developers">
               Start building
             </a>
@@ -69,6 +105,7 @@ export function App() {
               <a href={DOCS} target="_blank" rel="noreferrer">
                 Docs
               </a>
+              <Link to={signedIn ? "/dashboard" : "/login"}>{signedIn ? "Dashboard" : "Sign in"}</Link>
             </nav>
           )}
         </header>

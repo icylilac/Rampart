@@ -41,6 +41,10 @@ const baseSchema = z.object({
    * are never limited.
    */
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(0).default(300),
+  /** Sign-up, sign-in and wallet-challenge requests per minute per IP (0 = only the general limit). */
+  AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(0).default(10),
+  /** How long a dashboard sign-in lasts. */
+  USER_SESSION_DAYS: z.coerce.number().int().positive().default(30),
   /** Set to "true" behind a reverse proxy so client IPs come from X-Forwarded-For. */
   TRUST_PROXY: z
     .string()

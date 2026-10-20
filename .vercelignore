@@ -1,5 +1,4 @@
-# The API deploy only needs the service: src/, api/, prisma/ and package files.
-site
+# Files the API deploy (repo root) doesn't need. Not site/: the site project builds from it, and Vercel applies this file to both.
 contracts
 packages/sdk/dist
 node_modules

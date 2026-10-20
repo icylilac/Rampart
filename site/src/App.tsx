@@ -7,8 +7,8 @@ import { CONTRACT, CONTRACT_URL, FAILURES, GITHUB, PROVIDERS } from "./content";
 
 const DOCS = `${GITHUB}/blob/main/docs/reference.md`;
 const NAV = [
-  ["Problems", "#problems"],
-  ["How it works", "#how"],
+  ["Reliability", "#problems"],
+  ["Lifecycle", "#how"],
   ["Developers", "#developers"],
   ["Receipts", "#receipts"],
   ["Providers", "#providers"],
@@ -35,7 +35,7 @@ export function App() {
     <>
       <a className="announce" href={CONTRACT_URL} target="_blank" rel="noreferrer">
         <span className="sq" />
-        On-chain receipts are live on Stellar testnet <span aria-hidden>-&gt;</span>
+        Receipts contract live on Stellar testnet <span aria-hidden>-&gt;</span>
         <span className="sq" />
       </a>
 
@@ -53,7 +53,7 @@ export function App() {
               Docs
             </a>
             <a className="btn btn-solid hide-sm" href="#developers">
-              Get started
+              Start building
             </a>
             <button className="nav-burger" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
               <Icon name={menu ? "close" : "menu"} />
@@ -76,17 +76,18 @@ export function App() {
         <main id="top">
           <section className="hero box">
             <div className="hero-copy">
-              <h1>Fiat Ramps For Stellar That Actually Arrive</h1>
+              <h1>Fiat ramps for Stellar, verified on-chain.</h1>
               <p className="lead">
-                One API over Stripe, MoonPay and SEP-24 anchors. Rampart checks the wallet first, follows every
-                session to the end and verifies each delivery on-chain.
+                One API for Stripe, MoonPay and SEP-24 anchors.
+                <br />
+                Non&#8209;custodial by design.
               </p>
               <div className="actions">
                 <a className="btn btn-solid btn-lg" href="#developers">
-                  Get started <Icon name="arrow" />
+                  Start building <Icon name="arrow" />
                 </a>
                 <a className="btn btn-outline btn-lg" href={GITHUB} target="_blank" rel="noreferrer">
-                  View on GitHub
+                  GitHub
                 </a>
               </div>
             </div>
@@ -104,8 +105,8 @@ export function App() {
 
           <section id="problems" className="box section">
             <div className="section-head">
-              <span className="mono-label">[01] The problem</span>
-              <h2>Ramps fail in production in the same six ways.</h2>
+              <span className="mono-label">[01] Reliability</span>
+              <h2>Six failure modes, handled.</h2>
             </div>
             <div className="fail-grid">
               {FAILURES.map((f, i) => (
@@ -124,21 +125,18 @@ export function App() {
 
           <section id="how" className="box section split">
             <div className="section-head">
-              <span className="mono-label">[02] How it works</span>
-              <h2>Every session, followed to the end.</h2>
-              <p className="muted">
-                A real on-ramp: the Stripe webhook never arrives, the reconciler notices, and the delivery is still
-                verified on Stellar and receipted on-chain.
-              </p>
+              <span className="mono-label">[02] Lifecycle</span>
+              <h2>Tracked to settlement.</h2>
+              <p className="muted">A live on-ramp. The webhook is lost; the delivery still settles.</p>
               <ol className="how-steps">
                 <li>
                   <b>Create</b> a session from your backend
                 </li>
                 <li>
-                  <b>Pay</b> through the provider while the SDK runs each step
+                  <b>Pay</b> through the provider
                 </li>
                 <li>
-                  <b>Verify</b> on Stellar, record a receipt, sign a webhook
+                  <b>Verify</b> on Stellar and receipt on-chain
                 </li>
               </ol>
             </div>
@@ -148,12 +146,12 @@ export function App() {
           <section id="developers" className="box section split">
             <div className="section-head">
               <span className="mono-label">[03] Developers</span>
-              <h2>Server, browser and webhooks in a few lines.</h2>
+              <h2>Integrate in hours.</h2>
               <ul className="ticks">
-                <li>Typed TypeScript SDK with webhook verification</li>
-                <li>Browser runner that handles widgets and wallet signing</li>
-                <li>Idempotent sessions; webhooks signed and retried</li>
-                <li>Test keys run on a sandbox that simulates real failures</li>
+                <li>Typed TypeScript SDK</li>
+                <li>Browser runner for widgets and wallet signing</li>
+                <li>Idempotent sessions, signed webhooks</li>
+                <li>Sandbox that simulates real failures</li>
                 <li>
                   Self-host with <code>docker compose up</code>
                 </li>
@@ -165,16 +163,13 @@ export function App() {
           <section id="receipts" className="box section split">
             <div className="section-head">
               <span className="mono-label">[04] On-chain receipts</span>
-              <h2>Proof anyone can check.</h2>
-              <p className="muted">
-                Each verified delivery is written to a Soroban contract. Users and auditors don&apos;t have to take
-                anyone&apos;s word for it.
-              </p>
+              <h2>Proof, on-chain.</h2>
+              <p className="muted">Every verified delivery is recorded in a Soroban contract anyone can audit.</p>
               <ul className="ticks">
-                <li>Written once, by approved attesters only</li>
-                <li>One payment can never back two sessions</li>
-                <li>Refunds are marked on-chain too</li>
-                <li>The contract holds no funds</li>
+                <li>Write-once, attester-signed</li>
+                <li>One payment, one session</li>
+                <li>Refunds recorded</li>
+                <li>Holds no funds</li>
               </ul>
             </div>
             <div className="receipt-wrap">
@@ -206,8 +201,8 @@ export function App() {
 
           <section id="providers" className="box section">
             <div className="section-head">
-              <span className="mono-label">[05] Providers</span>
-              <h2>Bring the rails you need.</h2>
+              <span className="mono-label">[05] Coverage</span>
+              <h2>Global reach, local rails.</h2>
             </div>
             <div className="prov-grid">
               {PROVIDERS.map((p) => (
@@ -227,10 +222,10 @@ export function App() {
             <h2>Ship ramps your users can trust.</h2>
             <div className="actions">
               <a className="btn btn-solid btn-lg" href={GITHUB} target="_blank" rel="noreferrer">
-                Get started <Icon name="arrow" />
+                Start building <Icon name="arrow" />
               </a>
               <a className="btn btn-outline btn-lg" href={DOCS} target="_blank" rel="noreferrer">
-                Read the docs
+                Documentation
               </a>
             </div>
           </section>
@@ -241,7 +236,7 @@ export function App() {
             <img src="icon.svg" alt="" />
             Rampart
           </span>
-          <span className="mono-label">Non-custodial · KYC and payouts by licensed providers</span>
+          <span className="mono-label">Non-custodial · KYC and payouts by licensed partners</span>
         </footer>
       </div>
     </>

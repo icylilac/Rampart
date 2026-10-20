@@ -1,4 +1,4 @@
-/** Mirrors the Ricerca Ramp API objects (snake_case, amounts as decimal strings). */
+/** Mirrors the Rampart API objects (snake_case, amounts as decimal strings). */
 
 export type Direction = "ON" | "OFF";
 export type Provider = "STRIPE" | "MOONPAY" | "ANCHOR" | "SANDBOX";
@@ -181,7 +181,7 @@ export type ProvidersResponse = {
 
 export type AdvanceResult = { advanced: boolean; reason: "waiting_for_payment" | "scenario_finished" | null; session: RampSession };
 
-/** The event Ricerca Ramp POSTs to your webhook endpoint. */
+/** The event Rampart POSTs to your webhook endpoint. */
 export type WebhookEvent = {
   id: string;
   object: "event";

@@ -129,7 +129,7 @@ const stepMs = () => config().SANDBOX_STEP_SECONDS * 1000;
 
 /** The sandbox "anchor" account off-ramp payments go to. Deterministic, never funded. */
 export const SANDBOX_DESTINATION = Keypair.fromRawEd25519Seed(
-  createHash("sha256").update("ricerca-ramp-sandbox-destination").digest(),
+  createHash("sha256").update("rampart-sandbox-destination").digest(),
 ).publicKey();
 
 export function sandboxMeta(session: Pick<SessionContext, "metadata">): SandboxMeta {

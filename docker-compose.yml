@@ -10,10 +10,10 @@
 
 x-app: &app
   build: .
-  image: ricerca-ramp:local
+  image: rampart:local
   env_file: .env
   environment:
-    DATABASE_URL: postgresql://ricerca:${POSTGRES_PASSWORD:-ricerca}@db:5432/ricerca_ramp?schema=public
+    DATABASE_URL: postgresql://rampart:${POSTGRES_PASSWORD:-rampart}@db:5432/rampart?schema=public
     NODE_ENV: production
     # The worker container runs the reconciler; keep it out of the API process.
     WORKER_IN_PROCESS: "false"
@@ -23,13 +23,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ricerca
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ricerca}
-      POSTGRES_DB: ricerca_ramp
+      POSTGRES_USER: rampart
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rampart}
+      POSTGRES_DB: rampart
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ricerca -d ricerca_ramp"]
+      test: ["CMD-SHELL", "pg_isready -U rampart -d rampart"]
       interval: 5s
       timeout: 5s
       retries: 10

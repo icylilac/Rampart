@@ -1,5 +1,5 @@
 //! Ramp receipts: a public, append-only record of ramp deliveries that
-//! Ricerca Ramp has verified on Stellar.
+//! Rampart has verified on Stellar.
 //!
 //! The contract holds no funds and never moves any; the ramp stays
 //! non-custodial. After a live session completes and its delivery transaction

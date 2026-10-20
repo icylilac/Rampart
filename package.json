@@ -1,5 +1,5 @@
 {
-  "name": "ricerca-ramp",
+  "name": "rampart",
   "version": "0.1.0",
   "private": true,
   "description": "Non-custodial Stellar on/off-ramp infrastructure: one API over Stripe Crypto Onramp, SEP-24 anchors and MoonPay.",
@@ -23,8 +23,8 @@
     "dev:worker": "tsx watch src/worker.ts",
     "test": "vitest run",
     "project:create": "tsx src/cli/project-create.ts",
-    "sdk:build": "npm run build -w @ricerca/ramp",
-    "sdk:test": "npm test -w @ricerca/ramp"
+    "sdk:build": "npm run build -w @rampart/sdk",
+    "sdk:test": "npm test -w @rampart/sdk"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.1",

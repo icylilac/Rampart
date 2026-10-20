@@ -244,9 +244,9 @@ signatures, so the API key never leaves the project's server.
 | `none` | Nothing to do; wait for status updates |
 
 Outbound webhooks (`ramp_session.updated`) are signed with
-`Ricerca-Signature: t=<unix>,v1=<hex HMAC-SHA256(project secret, "t.body")>`
+`Rampart-Signature: t=<unix>,v1=<hex HMAC-SHA256(project secret, "t.body")>`
 and retried with backoff (30 s up to 12 h, 9 attempts). The SDK's
-`RicercaRamp.webhooks.constructEvent()` verifies them.
+`Rampart.webhooks.constructEvent()` verifies them.
 
 ## Test mode and the sandbox
 
@@ -281,10 +281,10 @@ as `sandbox.simulating`.
 
 ## SDK
 
-[`@ricerca/ramp`](../packages/sdk/README.md) (in `packages/sdk`, no runtime dependencies):
+[`@rampart/sdk`](../packages/sdk/README.md) (in `packages/sdk`, no runtime dependencies):
 
-- **Server** (`@ricerca/ramp`): typed client for every endpoint above, retries for safe requests, `listAll()` pagination, `RicercaRamp.webhooks.constructEvent()`, and sandbox helpers.
-- **Browser** (`@ricerca/ramp/browser`): `RampRunner` follows a session with its client secret and performs each `next_action`: opens the provider page, mounts Stripe's onramp widget, or has the wallet sign (`stellarWalletsKitSigner` adapts Stellar Wallets Kit: Freighter, xBull, Albedo and others).
+- **Server** (`@rampart/sdk`): typed client for every endpoint above, retries for safe requests, `listAll()` pagination, `Rampart.webhooks.constructEvent()`, and sandbox helpers.
+- **Browser** (`@rampart/sdk/browser`): `RampRunner` follows a session with its client secret and performs each `next_action`: opens the provider page, mounts Stripe's onramp widget, or has the wallet sign (`stellarWalletsKitSigner` adapts Stellar Wallets Kit: Freighter, xBull, Albedo and others).
 
 ```ts
 // server
@@ -520,7 +520,7 @@ All settings are environment variables validated at startup ([`src/config.ts`](.
 ├── Dockerfile · docker-compose.yml
 ├── contracts/ramp-receipts/    # Soroban contract: on-chain receipts of verified deliveries
 ├── prisma/schema.prisma        # projects, API keys, sessions, transitions, provider events, webhook deliveries
-├── packages/sdk/               # @ricerca/ramp: server client, webhook verification, browser runner
+├── packages/sdk/               # @rampart/sdk: server client, webhook verification, browser runner
 ├── scripts/
 │   ├── setup.sh                # first-time setup
 │   ├── preflight.ts            # wallet readiness CLI
@@ -577,7 +577,7 @@ All settings are environment variables validated at startup ([`src/config.ts`](.
 - [x] Outbound signed webhooks with exponential backoff
 - [x] Reconciler worker (poll open sessions, expire stale ones, retry verification)
 - [x] Sandbox provider with failure scenarios (test mode)
-- [x] `@ricerca/ramp` SDK: server client, webhook verification, browser `next_action` runner
+- [x] `@rampart/sdk` SDK: server client, webhook verification, browser `next_action` runner
 - [x] Docker image and docker-compose for self-hosting
 - [x] Unit, integration and SDK end-to-end tests; CI
 - [x] `ramp-receipts` Soroban contract: on-chain receipts of verified deliveries (testnet)

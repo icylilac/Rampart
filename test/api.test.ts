@@ -284,7 +284,7 @@ describe("outbound webhooks", () => {
   it("delivers signed events the project can verify", async () => {
     const received: { body: string; signature: string }[] = [];
     const fakeFetch = async (_url: string, init?: RequestInit) => {
-      received.push({ body: String(init?.body), signature: String((init?.headers as Record<string, string>)["Ricerca-Signature"]) });
+      received.push({ body: String(init?.body), signature: String((init?.headers as Record<string, string>)["Rampart-Signature"]) });
       return new Response(null, { status: 200 });
     };
     while ((await deliverDue(100, fakeFetch)) > 0);

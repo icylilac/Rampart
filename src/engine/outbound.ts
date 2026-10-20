@@ -9,7 +9,7 @@ import { serializeSession } from "./serialize";
 export const RETRY_DELAYS_SECONDS = [30, 120, 600, 1800, 3600, 10800, 21600, 43200];
 const TIMEOUT_MS = 10_000;
 
-/** `Ricerca-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "t.body")>` */
+/** `Rampart-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "t.body")>` */
 export function signPayload(secret: string, body: string, timestamp = Math.floor(Date.now() / 1000)): string {
   return `t=${timestamp},v1=${hmacHex(secret, `${timestamp}.${body}`)}`;
 }
@@ -67,9 +67,9 @@ export async function deliverDue(limit = 25, fetchImpl: FetchLike = fetch, now =
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "User-Agent": "RicercaRamp-Webhooks/1",
-          "Ricerca-Signature": signPayload(decrypt(d.project.webhookSecretEnc), body),
-          "Ricerca-Event-Id": (d.payload as { id?: string }).id ?? d.id,
+          "User-Agent": "Rampart-Webhooks/1",
+          "Rampart-Signature": signPayload(decrypt(d.project.webhookSecretEnc), body),
+          "Rampart-Event-Id": (d.payload as { id?: string }).id ?? d.id,
         },
         body,
         signal: AbortSignal.timeout(TIMEOUT_MS),

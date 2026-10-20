@@ -1,7 +1,7 @@
 {
-  "name": "@ricerca/ramp",
+  "name": "@rampart/sdk",
   "version": "0.1.0",
-  "description": "SDK for Ricerca Ramp: non-custodial Stellar on/off-ramps. Server client, webhook verification and a browser runner for next_action.",
+  "description": "SDK for Rampart: non-custodial Stellar on/off-ramps. Server client, webhook verification and a browser runner for next_action.",
   "license": "MIT",
   "sideEffects": false,
   "files": ["dist", "README.md"],

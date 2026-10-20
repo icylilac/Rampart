@@ -2,7 +2,7 @@ import { Keypair, TransactionBuilder } from "@stellar/stellar-sdk";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { RampRunner } from "../packages/sdk/src/browser";
-import { RicercaError, RicercaRamp } from "../packages/sdk/src/index";
+import { RampartError, Rampart } from "../packages/sdk/src/index";
 import { buildServer } from "../src/app";
 import { deliverDue } from "../src/engine/outbound";
 import { encrypt } from "../src/lib/crypto";
@@ -12,7 +12,7 @@ import { newApiKey } from "../src/lib/keys";
 /** The SDK against the real server over HTTP, in test mode. */
 let app: FastifyInstance;
 let baseUrl: string;
-let ramp: RicercaRamp;
+let ramp: Rampart;
 const webhookSecret = "whsec_e2e_secret";
 
 beforeAll(async () => {
@@ -29,7 +29,7 @@ beforeAll(async () => {
       apiKeys: { create: [{ mode: "TEST", keyHash: test.hash, prefix: test.prefix }] },
     },
   });
-  ramp = new RicercaRamp(test.key, { baseUrl });
+  ramp = new Rampart(test.key, { baseUrl });
 });
 
 afterAll(async () => {
@@ -95,20 +95,20 @@ describe("SDK end to end (test mode)", () => {
     // Other test files' projects share this database; check only this project's deliveries.
     await deliverDue(200, async (url, init) => {
       if (url !== "https://project.example/e2e") return new Response(null, { status: 204 });
-      received.push({ body: String(init?.body), sig: String((init?.headers as Record<string, string>)["Ricerca-Signature"]) });
+      received.push({ body: String(init?.body), sig: String((init?.headers as Record<string, string>)["Rampart-Signature"]) });
       return new Response(null, { status: 204 });
     });
     expect(received.length).toBeGreaterThan(0);
     for (const r of received) {
-      const event = RicercaRamp.webhooks.constructEvent(r.body, r.sig, webhookSecret);
+      const event = Rampart.webhooks.constructEvent(r.body, r.sig, webhookSecret);
       expect(event.type).toBe("ramp_session.updated");
       expect(event.livemode).toBe(false);
     }
   });
 
-  it("API errors arrive as RicercaError with the API's code", async () => {
+  it("API errors arrive as RampartError with the API's code", async () => {
     const err = await ramp.sessions.create({ direction: "ON", wallet_address: "nope", fiat_amount: 5 }).catch((e) => e);
-    expect(err).toBeInstanceOf(RicercaError);
+    expect(err).toBeInstanceOf(RampartError);
     expect(err.code).toBe("invalid_wallet");
     const all: string[] = [];
     for await (const s of ramp.sessions.listAll({ limit: 1 })) all.push(s.id);

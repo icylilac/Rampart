@@ -30,13 +30,13 @@ export default async function setup() {
 
   if (!url) {
     const { default: EmbeddedPostgres } = await import("embedded-postgres");
-    const dir = mkdtempSync(join(tmpdir(), "ricerca-pg-"));
+    const dir = mkdtempSync(join(tmpdir(), "rampart-pg-"));
     const port = await freePort();
     const pg = new EmbeddedPostgres({ databaseDir: dir, user: "postgres", password: "postgres", port, persistent: false, onLog: () => {} });
     await pg.initialise();
     await pg.start();
-    await pg.createDatabase("ricerca_test");
-    url = `postgresql://postgres:postgres@localhost:${port}/ricerca_test?schema=public`;
+    await pg.createDatabase("rampart_test");
+    url = `postgresql://postgres:postgres@localhost:${port}/rampart_test?schema=public`;
     stop = async () => {
       // pg.stop() can wait forever for the process to exit on Windows; don't let it hold the run open.
       await Promise.race([pg.stop(), new Promise((r) => setTimeout(r, 10_000))]);

@@ -1,13 +1,13 @@
-# @ricerca/ramp
+# @rampart/sdk
 
-SDK for [Ricerca Ramp](../../README.md): non-custodial on/off-ramps for Stellar.
+SDK for [Rampart](../../README.md): non-custodial on/off-ramps for Stellar.
 
 It has two parts:
 
 | Import | Runs on | Authenticates with | Use it to |
 |---|---|---|---|
-| `@ricerca/ramp` | Your server | Project API key (`rk_live_…` / `rk_test_…`) | Create and read sessions, pre-flight wallets, verify webhooks, drive the sandbox |
-| `@ricerca/ramp/browser` | The browser | The session's `client_secret` (`rcs_…`) | Follow one session and do each `next_action`: open the provider page, mount Stripe's widget, have the wallet sign |
+| `@rampart/sdk` | Your server | Project API key (`rk_live_…` / `rk_test_…`) | Create and read sessions, pre-flight wallets, verify webhooks, drive the sandbox |
+| `@rampart/sdk/browser` | The browser | The session's `client_secret` (`rcs_…`) | Follow one session and do each `next_action`: open the provider page, mount Stripe's widget, have the wallet sign |
 
 Your API key never reaches the browser. The client secret only opens its own session.
 
@@ -16,9 +16,9 @@ No runtime dependencies. Node 18+ on the server; any modern browser.
 ## Server
 
 ```ts
-import { RicercaRamp } from "@ricerca/ramp";
+import { Rampart } from "@rampart/sdk";
 
-const ramp = new RicercaRamp(process.env.RICERCA_KEY!, { baseUrl: "https://ramp.example.com" });
+const ramp = new Rampart(process.env.RAMPART_KEY!, { baseUrl: "https://ramp.example.com" });
 
 // Is the wallet ready? Returns unsigned fix-up XDR (e.g. a missing USDC trustline).
 const pf = await ramp.preflight({ wallet_address, asset: "USDC", direction: "ON", crypto_amount: 50 });
@@ -39,34 +39,34 @@ res.json({ sessionId: session.id, clientSecret: session.client_secret });
 
 Other calls: `sessions.retrieve(id)`, `sessions.list({ status, limit })`, `sessions.listAll()` (async iterator over every page), `sessions.events(id)` (status history), `sessions.refresh(id)`, `sessions.waitFor(id)`, `sessions.submitAnchorAuth(id, xdr)`, `sessions.submitTransaction(id, xdr)`, `providers()`.
 
-Errors are `RicercaError` with the API's `code` (`preflight_failed`, `idempotency_conflict`, `invalid_wallet`, …), `status` and `details`.
+Errors are `RampartError` with the API's `code` (`preflight_failed`, `idempotency_conflict`, `invalid_wallet`, …), `status` and `details`.
 
 ### Webhooks
 
-Ricerca Ramp POSTs a `ramp_session.updated` event whenever a session changes, signed with your project's webhook secret. Verify it against the **raw** body:
+Rampart POSTs a `ramp_session.updated` event whenever a session changes, signed with your project's webhook secret. Verify it against the **raw** body:
 
 ```ts
 import express from "express";
-import { RicercaRamp, RicercaSignatureError } from "@ricerca/ramp";
+import { Rampart, RampartSignatureError } from "@rampart/sdk";
 
 app.post("/hooks/ramp", express.raw({ type: "application/json" }), (req, res) => {
   try {
-    const event = RicercaRamp.webhooks.constructEvent(req.body, req.header("Ricerca-Signature"), process.env.RICERCA_WEBHOOK_SECRET!);
+    const event = Rampart.webhooks.constructEvent(req.body, req.header("Rampart-Signature"), process.env.RAMPART_WEBHOOK_SECRET!);
     const session = event.data.object;
     if (session.status === "COMPLETED" && session.onchain_verified) fulfil(session.external_reference);
     res.sendStatus(200);
   } catch (e) {
-    res.sendStatus(e instanceof RicercaSignatureError ? 400 : 500);
+    res.sendStatus(e instanceof RampartSignatureError ? 400 : 500);
   }
 });
 ```
 
-Treat a session as delivered only when `onchain_verified` is `true`: Ricerca Ramp checks the delivery on Stellar instead of trusting the provider's "completed".
+Treat a session as delivered only when `onchain_verified` is `true`: Rampart checks the delivery on Stellar instead of trusting the provider's "completed".
 
 ## Browser
 
 ```ts
-import { RampRunner, stellarWalletsKitSigner } from "@ricerca/ramp/browser";
+import { RampRunner, stellarWalletsKitSigner } from "@rampart/sdk/browser";
 import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit";
 
 const runner = new RampRunner({

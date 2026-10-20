@@ -17,6 +17,7 @@ export default defineConfig({
       STRIPE_WEBHOOK_SECRET: "whsec_test_stripe",
       // Off for the suite; test/security.test.ts turns it on.
       RATE_LIMIT_PER_MINUTE: "0",
+      AUTH_RATE_LIMIT_PER_MINUTE: "0",
     },
   },
 });

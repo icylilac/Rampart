@@ -11,6 +11,7 @@ The full design and operations guide. For the overview, see the [README](../READ
 - [Flows](#flows)
 - [Unified session status](#unified-session-status)
 - [API design](#api-design)
+- [Dashboard and accounts](#dashboard-and-accounts)
 - [Test mode and the sandbox](#test-mode-and-the-sandbox)
 - [SDK](#sdk)
 - [On-chain receipts](#on-chain-receipts)
@@ -248,6 +249,39 @@ Outbound webhooks (`ramp_session.updated`) are signed with
 and retried with backoff (30 s up to 12 h, 9 attempts). The SDK's
 `Rampart.webhooks.constructEvent()` verifies them.
 
+## Dashboard and accounts
+
+The site (`site/`) has sign-in, sign-up and a dashboard where users create
+projects and manage their API keys. There are two ways in:
+
+1. **Email + password.** Passwords are hashed with scrypt; a wrong password and
+   an unknown email get the same answer and take the same time.
+2. **Or a Stellar wallet.** The API issues a one-time challenge
+   (stateless, HMAC-signed, valid 5 minutes), Freighter signs it with SEP-53
+   (no transaction, no fee), and the API verifies the signature against the
+   address. The first wallet sign-in creates the account.
+
+Either way the API returns a session token (`rds_...`, 30 days by default)
+that the dashboard sends as `Authorization: Bearer`. Only its SHA-256 is
+stored, and signing out revokes it.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/auth/signup` | Create an account (`email`, `password` of 10+ characters) and sign in |
+| `POST` | `/v1/auth/login` | Sign in with email and password |
+| `POST` | `/v1/auth/wallet/challenge` | Message for the wallet to sign (`address`) |
+| `POST` | `/v1/auth/wallet` | Sign in with the signed challenge (`address`, `token`, `signature`) |
+| `GET` | `/v1/auth/me` | The signed-in user |
+| `POST` | `/v1/auth/logout` | End the session |
+| `GET` | `/v1/dashboard/projects` | The user's projects and their keys (prefixes only) |
+| `POST` | `/v1/dashboard/projects` | New project (`name`, optional `webhook_url`); returns the live key, test key and webhook secret once |
+| `POST` | `/v1/dashboard/projects/:id/keys` | New `live` or `test` key, returned once |
+| `DELETE` | `/v1/dashboard/projects/:id/keys/:keyId` | Revoke a key; it stops working immediately |
+
+Projects made with `npm run project:create` have no owner and don't appear in
+anyone's dashboard. The site calls the API set in `VITE_RAMPART_API_URL` at
+build time (default `http://localhost:8080`).
+
 ## Test mode and the sandbox
 
 Every request made with an `rk_test_` key runs on the **SANDBOX** provider:
@@ -354,6 +388,8 @@ Defined in [`prisma/schema.prisma`](../prisma/schema.prisma).
 
 ```mermaid
 erDiagram
+  USER ||--o{ PROJECT : manages
+  USER ||--o{ USER_SESSION : "signs in with"
   PROJECT ||--o{ API_KEY : "has"
   PROJECT ||--o{ RAMP_SESSION : owns
   PROJECT ||--o{ WEBHOOK_DELIVERY : receives
@@ -419,6 +455,7 @@ erDiagram
 - **Secrets at rest.** SEP-10 tokens and project webhook secrets are AES-256-GCM encrypted (`ENCRYPTION_KEY`); API keys and session client secrets are stored as SHA-256 hashes.
 - **Scoped browser access.** A session's client secret can read that one session and submit wallet signatures for it, nothing else. An unknown secret and another session's id return the same 404.
 - **Test mode is isolated.** `rk_test_` keys only ever reach the sandbox, and live and test sessions are invisible to each other.
+- **Dashboard sign-in.** Passwords are scrypt-hashed and session tokens stored as SHA-256. Wallet sign-in needs a SEP-53 signature of a one-time, server-signed challenge, so an address alone never opens an account. Sign-in endpoints have their own per-IP limit (10 a minute by default). Users only ever see and change their own projects.
 - **Abuse limits.** Requests are rate-limited per API key, client secret or IP; return URLs must be https; responses carry `nosniff`, `no-referrer` and frame-deny headers, and the sandbox page a strict CSP.
 - **Signed URLs.** MoonPay widget URLs are signed server-side, so wallet addresses and amounts can't be tampered with.
 - **Receipts contract.** The attester key can only write receipts (no funds, no transfers). The admin adds and removes attesters, and changing the admin needs both the old and the new account's signature.
@@ -435,8 +472,9 @@ npm run project:create -- --name "My app" --webhook-url https://my-app.example/h
 npm run dev            # http://localhost:8080/health (also runs the worker)
 ```
 
-`project:create` prints a live key, a test key and a webhook secret once. Try
-the sandbox straight away:
+`project:create` prints a live key, a test key and a webhook secret once (or
+sign up in the [dashboard](#dashboard-and-accounts) and create the project
+there). Try the sandbox straight away:
 
 ```sh
 curl -s localhost:8080/v1/sessions -H "Authorization: Bearer rk_test_..." \
@@ -510,6 +548,8 @@ All settings are environment variables validated at startup ([`src/config.ts`](.
 | `WORKER_IN_PROCESS` | | Run the reconciler inside the API (default `true`; `false` with a separate worker) |
 | `RECEIPTS_CONTRACT_ID`, `RECEIPTS_ATTESTER_SECRET` | for receipts | Record verified deliveries on-chain; set both or neither |
 | `RATE_LIMIT_PER_MINUTE` | | Requests per minute per API key, client secret or IP (default 300, `0` = off); health checks and provider webhooks are exempt |
+| `AUTH_RATE_LIMIT_PER_MINUTE` | | Sign-up, sign-in and wallet-challenge requests per minute per IP (default 10, `0` = off) |
+| `USER_SESSION_DAYS` | | How long a dashboard sign-in lasts (default 30) |
 | `TRUST_PROXY` | | `true` behind a reverse proxy, so client IPs come from `X-Forwarded-For` |
 | `SOROBAN_RPC_URL` | | Soroban RPC override; defaults to SDF's testnet RPC (or a mainnet RPC on `PUBLIC`) |
 
@@ -519,7 +559,7 @@ All settings are environment variables validated at startup ([`src/config.ts`](.
 .
 ├── Dockerfile · docker-compose.yml
 ├── contracts/ramp-receipts/    # Soroban contract: on-chain receipts of verified deliveries
-├── prisma/schema.prisma        # projects, API keys, sessions, transitions, provider events, webhook deliveries
+├── prisma/schema.prisma        # projects, API keys, users, sessions, transitions, provider events, webhook deliveries
 ├── packages/sdk/               # @rampart/sdk: server client, webhook verification, browser runner
 ├── scripts/
 │   ├── setup.sh                # first-time setup
@@ -578,6 +618,7 @@ All settings are environment variables validated at startup ([`src/config.ts`](.
 - [x] Reconciler worker (poll open sessions, expire stale ones, retry verification)
 - [x] Sandbox provider with failure scenarios (test mode)
 - [x] `@rampart/sdk` SDK: server client, webhook verification, browser `next_action` runner
+- [x] Dashboard: email + password or Freighter wallet sign-in, projects and API keys
 - [x] Docker image and docker-compose for self-hosting
 - [x] Unit, integration and SDK end-to-end tests; CI
 - [x] `ramp-receipts` Soroban contract: on-chain receipts of verified deliveries (testnet)

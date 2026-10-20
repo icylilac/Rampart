@@ -16,6 +16,7 @@ import {
   submitTransaction,
 } from "./engine/sessions";
 import { requireApiKey, requireClientSecret } from "./http/auth";
+import { dashboardRoutes } from "./http/dashboard";
 import { sandboxCheckoutPage } from "./http/sandbox-page";
 import { sha256Hex } from "./lib/crypto";
 import { ApiError, badRequest } from "./lib/errors";
@@ -93,11 +94,18 @@ const idParams = z.object({ id: z.string().uuid() });
 
 // ------------------------------------------------------------------ server
 
-/** CORS for the browser-facing routes; they take no cookies, only a client secret. */
+/**
+ * Routes a browser calls directly: a session's client secret (/v1/client) and
+ * the dashboard (/v1/auth, /v1/dashboard). They take bearer tokens, never
+ * cookies, so any origin may call them.
+ */
+const BROWSER_ROUTES = ["/v1/client/", "/v1/auth/", "/v1/dashboard/"];
+const isBrowserRoute = (url: string) => BROWSER_ROUTES.some((p) => url.startsWith(p));
+
 function cors(reply: FastifyReply) {
   reply.header("Access-Control-Allow-Origin", "*");
   reply.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
-  reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  reply.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   reply.header("Access-Control-Max-Age", "600");
 }
 
@@ -111,9 +119,11 @@ export function buildServer(): FastifyInstance {
   const cfg = config();
   const app = Fastify({ logger: cfg.NODE_ENV !== "test", bodyLimit: 256 * 1024, trustProxy: cfg.TRUST_PROXY });
 
-  if (cfg.RATE_LIMIT_PER_MINUTE > 0) {
+  if (cfg.RATE_LIMIT_PER_MINUTE > 0 || cfg.AUTH_RATE_LIMIT_PER_MINUTE > 0) {
     void app.register(rateLimit, {
-      max: cfg.RATE_LIMIT_PER_MINUTE,
+      // With the general limit off, only routes with their own limit (sign-in) are limited.
+      global: cfg.RATE_LIMIT_PER_MINUTE > 0,
+      max: cfg.RATE_LIMIT_PER_MINUTE || 1,
       timeWindow: "1 minute",
       keyGenerator: rateLimitKey,
       // Providers retry webhooks we refuse; health checks come from the platform.
@@ -121,7 +131,9 @@ export function buildServer(): FastifyInstance {
     });
   }
 
-  app.addHook("onSend", async (_request, reply) => {
+  app.addHook("onSend", async (request, reply) => {
+    // Here rather than per route, so errors and 429s carry it too.
+    if (isBrowserRoute(request.url)) cors(reply);
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("Referrer-Policy", "no-referrer");
     reply.header("X-Frame-Options", "DENY");
@@ -140,7 +152,6 @@ export function buildServer(): FastifyInstance {
   });
 
   app.setErrorHandler((err, request, reply) => {
-    if (request.url.startsWith("/v1/client")) cors(reply);
     if (err instanceof ApiError) {
       return reply.status(err.statusCode).send({ error: { code: err.code, message: err.message, details: err.details } });
     }
@@ -278,16 +289,10 @@ export function buildServer(): FastifyInstance {
       return { advanced, reason: reason ?? null, session: serializeSession(session) };
     });
 
-    // ---------------------------------------------------------------- browser API (client secret)
-    app.options("/v1/client/*", async (_request, reply) => {
-      cors(reply);
-      return reply.status(204).send();
-    });
+    // ---------------------------------------------------------------- browser API (client secret, dashboard)
+    for (const prefix of BROWSER_ROUTES) app.options(`${prefix}*`, async (_request, reply) => reply.status(204).send());
 
-    const clientRoute = (handler: (request: FastifyRequest) => Promise<unknown>) => async (request: FastifyRequest, reply: FastifyReply) => {
-      cors(reply);
-      return handler(request);
-    };
+    const clientRoute = (handler: (request: FastifyRequest) => Promise<unknown>) => async (request: FastifyRequest) => handler(request);
 
     app.get(
       "/v1/client/sessions/:id",
@@ -314,6 +319,8 @@ export function buildServer(): FastifyInstance {
         return serializeSession(await submitTransaction(await requireClientSecret(request, id), signed_xdr));
       }),
     );
+
+    dashboardRoutes(app);
 
     // ---------------------------------------------------------------- provider webhooks
     const webhookRoute = (id: "STRIPE" | "MOONPAY") => async (request: FastifyRequest, reply: FastifyReply) => {

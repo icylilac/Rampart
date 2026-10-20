@@ -26,6 +26,7 @@ never arrived. Rampart handles these so your project doesn't have to.
 - **On-chain receipts:** verified deliveries are recorded in a Soroban contract that anyone can check.
 - **Non-custodial:** never holds keys or funds. Wallets sign; Rampart builds and checks.
 - **Test mode:** `rk_test_` keys run on a sandbox that simulates real failures.
+- **Dashboard:** sign in with email or a Freighter wallet to create projects and manage API keys.
 - **SDK and self-hosting:** a TypeScript SDK for server and browser, and a Docker image.
 
 ## How it works
@@ -52,9 +53,11 @@ Requires Node.js 22.12+ and PostgreSQL 14+.
 ```sh
 npm run setup                                  # .env, dependencies, Prisma client
 npm run db:migrate
-npm run project:create -- --name "My app"      # prints live and test API keys
 npm run dev                                    # http://localhost:8080
+cd site && npm install && npm run dev          # dashboard at http://localhost:5173/signup
 ```
+
+Create a project in the dashboard to get live and test API keys, or from the command line with `npm run project:create -- --name "My app"`.
 
 Or with Docker: `docker compose up -d --build`.
 

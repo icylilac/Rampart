@@ -97,7 +97,7 @@ describe("SDK end to end (test mode)", () => {
       if (url !== "https://project.example/e2e") return new Response(null, { status: 204 });
       received.push({ body: String(init?.body), sig: String((init?.headers as Record<string, string>)["Rampart-Signature"]) });
       return new Response(null, { status: 204 });
-    });
+    }, new Date(), async () => ["203.0.113.7"]);
     expect(received.length).toBeGreaterThan(0);
     for (const r of received) {
       const event = Rampart.webhooks.constructEvent(r.body, r.sig, webhookSecret);

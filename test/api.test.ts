@@ -16,6 +16,8 @@ let testKey: string;
 const webhookSecret = "whsec_test_project_secret";
 const auth = (key: string) => ({ authorization: `Bearer ${key}` });
 const wallet = () => Keypair.random();
+// The project's webhook host (project.example) doesn't resolve; pretend it's public.
+const publicDns = async () => ["203.0.113.7"];
 
 type Session = {
   id: string;
@@ -287,7 +289,7 @@ describe("outbound webhooks", () => {
       received.push({ body: String(init?.body), signature: String((init?.headers as Record<string, string>)["Rampart-Signature"]) });
       return new Response(null, { status: 200 });
     };
-    while ((await deliverDue(100, fakeFetch)) > 0);
+    while ((await deliverDue(100, fakeFetch, new Date(), publicDns)) > 0);
     expect(received.length).toBeGreaterThan(0);
     for (const { body, signature } of received) {
       const [, t, v1] = /^t=(\d+),v1=([0-9a-f]+)$/.exec(signature)!;
@@ -301,7 +303,7 @@ describe("outbound webhooks", () => {
     const { body } = await create({ direction: "ON", wallet_address: wallet().publicKey(), fiat_amount: 10 });
     const failing = async () => new Response(null, { status: 500 });
     // Other test files' deliveries share this database; drain until this one is attempted.
-    while ((await deliverDue(100, failing)) > 0);
+    while ((await deliverDue(100, failing, new Date(), publicDns)) > 0);
     const retried = await db().webhookDelivery.findFirstOrThrow({ where: { sessionId: body.id } });
     expect(retried.status).toBe("PENDING");
     expect(retried.attempts).toBe(1);

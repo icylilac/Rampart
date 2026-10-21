@@ -450,6 +450,7 @@ erDiagram
 
 - **No user keys, ever.** Wallets sign; the service builds unsigned XDR and validates what comes back.
 - **Anchor allowlist.** Only domains in `ANCHOR_DOMAINS` are contacted, over HTTPS, which prevents SSRF.
+- **Webhook targets.** Webhook URLs must be public https URLs. Private, loopback and link-local addresses (including cloud metadata at `169.254.169.254`) are refused when the URL is saved and again before every delivery, after resolving the hostname. Redirects are not followed. `localhost` is allowed only with `NODE_ENV=development`.
 - **SEP-10 validation.** A challenge is checked against the anchor's `SIGNING_KEY` and home domain before the wallet sees it, and the signed challenge must be the one issued for that session.
 - **Webhook verification.** Stripe (`Stripe-Signature`, `v1`) and MoonPay (`Moonpay-Signature-V2`) signatures are HMAC-SHA256 with constant-time comparison and a 5-minute timestamp window. Events are deduplicated by provider event id.
 - **Secrets at rest.** SEP-10 tokens and project webhook secrets are AES-256-GCM encrypted (`ENCRYPTION_KEY`); API keys and session client secrets are stored as SHA-256 hashes.

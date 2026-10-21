@@ -7,6 +7,7 @@ import { addApiKey, createProject } from "../engine/projects";
 import { db } from "../lib/db";
 import { ApiError, notFound } from "../lib/errors";
 import { isStellarAddress } from "../lib/wallet-challenge";
+import { webhookUrlProblem } from "../lib/webhook-target";
 import { requireUser } from "./auth";
 
 /**
@@ -27,15 +28,6 @@ const address = z.string().trim().refine(isStellarAddress, "Enter a Stellar acco
 const challengeBody = z.object({ address }).strict();
 const walletBody = z.object({ address, token: z.string().min(1).max(1000), signature: z.string().min(1).max(200) }).strict();
 
-const webhookUrl = z
-  .string()
-  .trim()
-  .url()
-  .refine((v) => {
-    const u = new URL(v);
-    return u.protocol === "https:" || (u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname));
-  }, "Must be an https URL (http is allowed for localhost only).");
-const projectBody = z.object({ name: z.string().trim().min(1).max(80), webhook_url: webhookUrl.nullish() }).strict();
 const keyBody = z.object({ mode: z.enum(["live", "test"]) }).strict();
 const projectParams = z.object({ id: z.string().uuid() });
 const keyParams = z.object({ id: z.string().uuid(), keyId: z.string().uuid() });
@@ -77,6 +69,16 @@ async function ownedProject(userId: string, id: string) {
 
 export function dashboardRoutes(app: FastifyInstance) {
   const cfg = config();
+  // Checked again, with DNS, before every delivery (src/engine/outbound.ts).
+  const webhookUrl = z
+    .string()
+    .trim()
+    .url()
+    .superRefine((v, ctx) => {
+      const problem = webhookUrlProblem(v, cfg.NODE_ENV === "development");
+      if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+    });
+  const projectBody = z.object({ name: z.string().trim().min(1).max(80), webhook_url: webhookUrl.nullish() }).strict();
   // Sign-in endpoints get their own, tighter per-IP budget against password guessing.
   const authLimit =
     cfg.AUTH_RATE_LIMIT_PER_MINUTE > 0

@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { RampSession } from "@prisma/client";
+import { config } from "../config";
 import { decrypt, hmacHex } from "../lib/crypto";
 import { db } from "../lib/db";
+import { assertDeliverable, resolveHost, type ResolveHost } from "../lib/webhook-target";
 import type { FetchLike } from "../stellar/horizon";
 import { serializeSession } from "./serialize";
 
@@ -34,8 +36,16 @@ export async function enqueueSessionEvent(session: RampSession): Promise<void> {
 /**
  * Sends due deliveries. Each one is claimed with a conditional update on its
  * attempt count, so several workers can run without sending an event twice.
+ * The URL is checked right before sending (see src/lib/webhook-target.ts),
+ * and redirects aren't followed, so it can't lead to an internal address.
  */
-export async function deliverDue(limit = 25, fetchImpl: FetchLike = fetch, now = new Date()): Promise<number> {
+export async function deliverDue(
+  limit = 25,
+  fetchImpl: FetchLike = fetch,
+  now = new Date(),
+  resolve: ResolveHost = resolveHost,
+): Promise<number> {
+  const allowLocal = config().NODE_ENV === "development";
   const due = await db().webhookDelivery.findMany({
     where: { status: "PENDING", nextAttemptAt: { lte: now } },
     orderBy: { nextAttemptAt: "asc" },
@@ -63,6 +73,7 @@ export async function deliverDue(limit = 25, fetchImpl: FetchLike = fetch, now =
     let statusCode: number | null = null;
     let error: string | null = null;
     try {
+      await assertDeliverable(d.project.webhookUrl, allowLocal, resolve);
       const res = await fetchImpl(d.project.webhookUrl, {
         method: "POST",
         headers: {
@@ -73,9 +84,11 @@ export async function deliverDue(limit = 25, fetchImpl: FetchLike = fetch, now =
         },
         body,
         signal: AbortSignal.timeout(TIMEOUT_MS),
+        redirect: "manual",
       });
       statusCode = res.status;
-      if (!res.ok) error = `HTTP ${res.status}`;
+      if (res.status >= 300 && res.status < 400) error = `HTTP ${res.status}: redirects are not followed`;
+      else if (!res.ok) error = `HTTP ${res.status}`;
     } catch (e) {
       error = (e as Error).message;
     }

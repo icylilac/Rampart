@@ -1,5 +1,7 @@
 import { createProject } from "../engine/projects";
+import { config } from "../config";
 import { db } from "../lib/db";
+import { webhookUrlProblem } from "../lib/webhook-target";
 
 /**
  * Creates a project with a live key, a test key and a webhook secret.
@@ -21,8 +23,9 @@ async function main() {
     console.error('Usage: npm run project:create -- --name "My app" [--webhook-url https://...]');
     process.exit(1);
   }
-  if (webhookUrl && !/^https?:\/\//.test(webhookUrl)) {
-    console.error("--webhook-url must be an http(s) URL");
+  const problem = webhookUrl ? webhookUrlProblem(webhookUrl, config().NODE_ENV === "development") : null;
+  if (problem) {
+    console.error(`--webhook-url: ${problem}`);
     process.exit(1);
   }
 

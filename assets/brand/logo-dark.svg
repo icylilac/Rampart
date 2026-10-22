@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 160" width="1120" height="320">
-  <rect width="560" height="160" fill="#0B1B3A"/>
-  <g transform="translate(20 20)">
-      <rect x="6" y="6" width="108" height="108" rx="26" fill="#FFFFFF"/>
-      <path d="M22 94 L98 94 L98 34 Z" fill="#14B8A6" opacity="0.9"/>
-      <path d="M34 62 L50 78 L86 38" fill="none" stroke="#0B1B3A" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></g>
-  <text x="168" y="102" font-family="'Segoe UI', Inter, 'Helvetica Neue', Arial, sans-serif" font-size="64" font-weight="700" letter-spacing="-1" fill="#FFFFFF">Rampart</text>
-</svg>

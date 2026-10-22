@@ -115,8 +115,16 @@ describe("hardening", () => {
           expiresAt: new Date(Date.now() + 3_600_000),
         },
       });
+      // Due a second ago, not at the database's own now(): that is rounded to the
+      // millisecond and can land just after the `now` deliverDue is given.
       const delivery = await db().webhookDelivery.create({
-        data: { projectId: p.id, sessionId: session.id, eventType: "ramp_session.updated", payload: { id: `evt_${session.id}` } },
+        data: {
+          projectId: p.id,
+          sessionId: session.id,
+          eventType: "ramp_session.updated",
+          payload: { id: `evt_${session.id}` },
+          nextAttemptAt: new Date(Date.now() - 1000),
+        },
       });
       return { deliveries: [delivery] };
     };
@@ -134,8 +142,15 @@ describe("hardening", () => {
         : new Response(null, { status: 200 });
     };
     const dns = async (host: string) => (host === "internal.example" ? ["10.0.0.5"] : ["203.0.113.7"]);
-    // Other test files' deliveries share this database; drain until these are attempted.
-    while ((await deliverDue(100, fakeFetch, new Date(), dns)) > 0);
+    // Other test files' deliveries share this database; drain until these three
+    // have been attempted. deliverDue returns how many succeeded, and all three
+    // are meant to fail, so its result can't tell us when to stop.
+    const ids = [internal, redirecting, literal].map((p) => p.deliveries[0].id);
+    const attempted = () => db().webhookDelivery.count({ where: { id: { in: ids }, attempts: { gt: 0 } } });
+    for (let pass = 0; pass < 20 && (await attempted()) < ids.length; pass++) {
+      await deliverDue(100, fakeFetch, new Date(), dns);
+    }
+    expect(await attempted()).toBe(ids.length);
 
     expect(fetched).not.toContain("https://internal.example/hooks");
     expect(fetched.some((u) => u.startsWith("https://169.254.169.254"))).toBe(false);

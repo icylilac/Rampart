@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/brand/icon.svg" width="88" alt="Rampart logo">
+  <img src="site/public/icon.svg" width="88" alt="Rampart logo">
 </p>
 
 <h1 align="center">Rampart</h1>

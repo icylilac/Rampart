@@ -1,4 +1,4 @@
-export const GITHUB = "https://github.com/Agentium-AI/Rampart";
+export const GITHUB = "https://github.com/icylilac/Rampart";
 export const CONTRACT = "CDJK4Y5OLDZJE566HEYRVGBXT4E56EQC2VT6ZP25436M2BX2YRVWKUYT";
 export const CONTRACT_URL = `https://stellar.expert/explorer/testnet/contract/${CONTRACT}`;
 

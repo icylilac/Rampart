@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Non-custodial Stellar on/off-ramp infrastructure: one API over Stripe Crypto Onramp, SEP-24 anchors and MoonPay.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "commonjs",
   "engines": {
     "node": ">=22.12"

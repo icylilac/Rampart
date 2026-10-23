@@ -269,7 +269,11 @@ describe("reconciler", () => {
     expect(stale.session.status).toBe("PROCESSING");
 
     // A poll asked after the last change may still move it back (e.g. an anchor needs more info).
-    const fresh = await applyUpdate(body.id, { status: "AWAITING_PAYMENT", providerStatus: "waiting" }, "poll", "test", { observedAt: new Date() });
+    // Ignoring the stale poll still wrote lastPolledAt, and the stored updatedAt can round up past
+    // the current millisecond, so "after the last change" is read from the stored row, not new Date().
+    const { updatedAt } = await db().rampSession.findUniqueOrThrow({ where: { id: body.id } });
+    const askedAfter = new Date(updatedAt.getTime() + 1);
+    const fresh = await applyUpdate(body.id, { status: "AWAITING_PAYMENT", providerStatus: "waiting" }, "poll", "test", { observedAt: askedAfter });
     expect(fresh.session.status).toBe("AWAITING_PAYMENT");
   });
 
@@ -303,7 +307,13 @@ describe("outbound webhooks", () => {
     const { body } = await create({ direction: "ON", wallet_address: wallet().publicKey(), fiat_amount: 10 });
     const failing = async () => new Response(null, { status: 500 });
     // Other test files' deliveries share this database; drain until this one is attempted.
-    while ((await deliverDue(100, failing, new Date(), publicDns)) > 0);
+    // deliverDue returns how many succeeded, and every delivery fails here, so its result can't
+    // tell us when to stop. A later pass also picks the delivery up if the database's now()
+    // made it due a moment after the first pass's `now`.
+    const attempted = () => db().webhookDelivery.count({ where: { sessionId: body.id, attempts: { gt: 0 } } });
+    for (let pass = 0; pass < 20 && (await attempted()) === 0; pass++) {
+      await deliverDue(100, failing, new Date(), publicDns);
+    }
     const retried = await db().webhookDelivery.findFirstOrThrow({ where: { sessionId: body.id } });
     expect(retried.status).toBe("PENDING");
     expect(retried.attempts).toBe(1);

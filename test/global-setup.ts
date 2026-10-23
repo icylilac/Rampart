@@ -32,7 +32,7 @@ export default async function setup() {
     const { default: EmbeddedPostgres } = await import("embedded-postgres");
     const dir = mkdtempSync(join(tmpdir(), "rampart-pg-"));
     const port = await freePort();
-    const pg = new EmbeddedPostgres({ databaseDir: dir, user: "postgres", password: "postgres", port, persistent: false, onLog: () => {} });
+    const pg = new EmbeddedPostgres({ databaseDir: dir, user: "postgres", password: "postgres", port, persistent: true, onLog: () => {} });
     await pg.initialise();
     await pg.start();
     await pg.createDatabase("rampart_test");
@@ -40,7 +40,14 @@ export default async function setup() {
     stop = async () => {
       // pg.stop() can wait forever for the process to exit on Windows; don't let it hold the run open.
       await Promise.race([pg.stop(), new Promise((r) => setTimeout(r, 10_000))]);
-      rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+      // The folder is removed here rather than by embedded-postgres (persistent: true). On Windows
+      // Postgres can hold its files for a moment after stopping, so retry, and if a file is still
+      // locked, leave the folder in the temp directory with a warning instead of failing the run.
+      try {
+        rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+      } catch (error) {
+        console.warn(`Could not remove the test database folder ${dir}: ${(error as Error).message}`);
+      }
     };
   }
 

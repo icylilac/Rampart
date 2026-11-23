@@ -276,6 +276,13 @@ main > .box + .box { border-top: 0; }
 .inline-edit input { flex: 1 1 260px; height: 34px; padding: 0 10px; border: 1px solid var(--line); font: inherit; font-size: 14px; }
 .inline-edit .field-hint, .inline-edit .form-error { flex-basis: 100%; }
 
+.project-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.project-rename { margin-bottom: 8px; }
+.project-rename input { font-size: 18px; height: 40px; }
+.project-foot { display: flex; justify-content: flex-end; }
+.link-btn.danger { color: #B42318; }
+.link-btn:disabled { opacity: .5; cursor: default; }
+
 /* Ramps */
 .ramps { display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 18px; }
 .ramps-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }

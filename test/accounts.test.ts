@@ -189,6 +189,23 @@ describe("dashboard API", () => {
     expect((await patch(owner.token, null)).json().webhook_url).toBeNull();
   });
 
+  it("renames a project, and deleting it hides it and stops its keys", async () => {
+    const owner = await signUp();
+    const created = (await app.inject({ method: "POST", url: "/v1/dashboard/projects", headers: bearer(owner.token), payload: { name: "Old name" } })).json();
+    const url = `/v1/dashboard/projects/${created.project.id}`;
+    const renamed = await app.inject({ method: "PATCH", url, headers: bearer(owner.token), payload: { name: "  New name " } });
+    expect(renamed.json()).toMatchObject({ name: "New name", webhook_url: null });
+    expect((await app.inject({ method: "PATCH", url, headers: bearer(owner.token), payload: {} })).statusCode).toBe(400);
+    expect((await app.inject({ url: "/v1/sessions", headers: bearer(created.secrets.test_key) })).statusCode).toBe(200);
+
+    expect((await app.inject({ method: "DELETE", url, headers: bearer(owner.token) })).statusCode).toBe(204);
+    expect((await app.inject({ url: "/v1/dashboard/projects", headers: bearer(owner.token) })).json().data).toEqual([]);
+    expect((await app.inject({ url: "/v1/sessions", headers: bearer(created.secrets.test_key) })).statusCode).toBe(401);
+    expect((await app.inject({ method: "PATCH", url, headers: bearer(owner.token), payload: { name: "Back" } })).statusCode).toBe(404);
+    expect((await app.inject({ method: "DELETE", url, headers: bearer(owner.token) })).statusCode).toBe(404);
+    expect(await db().project.count({ where: { id: created.project.id } })).toBe(1);
+  });
+
   it("needs a signed-in user, not an API key, for the dashboard", async () => {
     expect((await app.inject({ url: "/v1/dashboard/projects" })).statusCode).toBe(401);
     expect((await app.inject({ url: "/v1/dashboard/projects", headers: bearer("rk_test_" + "a".repeat(24)) })).statusCode).toBe(401);

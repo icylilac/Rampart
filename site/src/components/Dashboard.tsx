@@ -113,6 +113,7 @@ export function DashboardPage() {
             key={p.id}
             project={p}
             onChange={(next) => setProjects((all) => all?.map((x) => (x.id === next.id ? next : x)) ?? null)}
+            onRemove={(id) => setProjects((all) => all?.filter((x) => x.id !== id) ?? null)}
             onSecret={setReveal}
           />
         ))}
@@ -177,7 +178,17 @@ function NewProject({ onCreated }: { onCreated: (p: Project, s: { live_key: stri
   );
 }
 
-function ProjectCard({ project, onChange, onSecret }: { project: Project; onChange: (p: Project) => void; onSecret: (r: Reveal) => void }) {
+function ProjectCard({
+  project,
+  onChange,
+  onRemove,
+  onSecret,
+}: {
+  project: Project;
+  onChange: (p: Project) => void;
+  onRemove: (id: string) => void;
+  onSecret: (r: Reveal) => void;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const active = project.api_keys.filter((k) => !k.revoked_at);
@@ -193,6 +204,19 @@ function ProjectCard({ project, onChange, onSecret }: { project: Project; onChan
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the key.");
     } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove() {
+    if (!window.confirm(`Delete ${project.name}? Its API keys stop working immediately and webhooks stop. Its ramp history is kept.`)) return;
+    setBusy("delete");
+    setError(null);
+    try {
+      await api(`/v1/dashboard/projects/${project.id}`, { method: "DELETE" });
+      onRemove(project.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete the project.");
       setBusy(null);
     }
   }
@@ -215,7 +239,7 @@ function ProjectCard({ project, onChange, onSecret }: { project: Project; onChan
     <article className="box section project">
       <div className="project-head">
         <div>
-          <h2>{project.name}</h2>
+          <ProjectName project={project} onChange={onChange} />
           <p className="mono-label">
             {project.id} · created {date(project.created_at)}
           </p>
@@ -262,7 +286,69 @@ function ProjectCard({ project, onChange, onSecret }: { project: Project; onChan
         </p>
       )}
       <Ramps project={project} />
+      <div className="project-foot">
+        <button className="link-btn danger" disabled={busy !== null} onClick={() => void remove()}>
+          {busy === "delete" ? "Deleting…" : "Delete project"}
+        </button>
+      </div>
     </article>
+  );
+}
+
+/** The project's name, renamable in place. */
+function ProjectName({ project, onChange }: { project: Project; onChange: (p: Project) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(project.name);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    if (!value.trim()) return setError("Give the project a name.");
+    setBusy(true);
+    setError(null);
+    try {
+      onChange(await api<Project>(`/v1/dashboard/projects/${project.id}`, { method: "PATCH", body: { name: value.trim() } }));
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not rename the project.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="project-title">
+        <h2>{project.name}</h2>
+        <button
+          className="link-btn"
+          onClick={() => {
+            setValue(project.name);
+            setEditing(true);
+          }}
+          aria-label={`Rename ${project.name}`}
+        >
+          Rename
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form className="inline-edit project-rename" onSubmit={(e) => void save(e)} noValidate>
+      <input autoFocus value={value} onChange={(e) => setValue(e.target.value)} maxLength={80} aria-label="Project name" />
+      <button type="submit" className="btn btn-solid btn-sm" disabled={busy}>
+        {busy ? "Saving…" : "Save"}
+      </button>
+      <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+      {error && (
+        <p role="alert" className="form-error">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
 

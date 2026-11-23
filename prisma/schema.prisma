@@ -20,6 +20,8 @@ model Project {
   ownerId          String?           @map("owner_id")
   owner            User?             @relation(fields: [ownerId], references: [id])
   createdAt        DateTime          @default(now()) @map("created_at")
+  /// Deleted from the dashboard: hidden, keys revoked, history kept.
+  archivedAt       DateTime?         @map("archived_at")
   apiKeys          ApiKey[]
   sessions         RampSession[]
   deliveries       WebhookDelivery[]

@@ -65,9 +65,9 @@ const serializeProject = (p: Project & { apiKeys: ApiKey[] }) => ({
   api_keys: p.apiKeys.map(serializeKey),
 });
 
-/** A project the user owns; anyone else's looks like it doesn't exist. */
+/** A project the user owns and hasn't deleted; anyone else's looks like it doesn't exist. */
 async function ownedProject(userId: string, id: string) {
-  const project = await db().project.findFirst({ where: { id, ownerId: userId } });
+  const project = await db().project.findFirst({ where: { id, ownerId: userId, archivedAt: null } });
   if (!project) throw notFound("Project");
   return project;
 }
@@ -84,8 +84,11 @@ export function dashboardRoutes(app: FastifyInstance) {
       if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
     });
   const projectBody = z.object({ name: z.string().trim().min(1).max(80), webhook_url: webhookUrl.nullish() }).strict();
-  // null removes the webhook. Deliveries already queued go to the new URL.
-  const projectPatch = z.object({ webhook_url: webhookUrl.nullable() }).strict();
+  // webhook_url null removes the webhook. Deliveries already queued go to the new URL.
+  const projectPatch = z
+    .object({ name: z.string().trim().min(1).max(80).optional(), webhook_url: webhookUrl.nullable().optional() })
+    .strict()
+    .refine((b) => b.name !== undefined || b.webhook_url !== undefined, "Send a name or a webhook_url.");
   // Sign-in endpoints get their own, tighter per-IP budget.
   const authLimit =
     cfg.AUTH_RATE_LIMIT_PER_MINUTE > 0
@@ -121,7 +124,7 @@ export function dashboardRoutes(app: FastifyInstance) {
   app.get("/v1/dashboard/projects", async (request) => {
     const { user } = await requireUser(request);
     const projects = await db().project.findMany({
-      where: { ownerId: user.id },
+      where: { ownerId: user.id, archivedAt: null },
       orderBy: { createdAt: "desc" },
       include: { apiKeys: { orderBy: { createdAt: "asc" } } },
     });
@@ -131,7 +134,7 @@ export function dashboardRoutes(app: FastifyInstance) {
   app.post("/v1/dashboard/projects", async (request, reply) => {
     const { user } = await requireUser(request);
     const b = projectBody.parse(request.body);
-    if ((await db().project.count({ where: { ownerId: user.id } })) >= MAX_PROJECTS_PER_USER) {
+    if ((await db().project.count({ where: { ownerId: user.id, archivedAt: null } })) >= MAX_PROJECTS_PER_USER) {
       throw new ApiError(409, "project_limit", `An account can have up to ${MAX_PROJECTS_PER_USER} projects.`);
     }
     const { project, secrets } = await createProject({ name: b.name, webhookUrl: b.webhook_url, ownerId: user.id });
@@ -160,10 +163,24 @@ export function dashboardRoutes(app: FastifyInstance) {
     await ownedProject(user.id, id);
     const project = await db().project.update({
       where: { id },
-      data: { webhookUrl: b.webhook_url },
+      data: { name: b.name, webhookUrl: b.webhook_url },
       include: { apiKeys: { orderBy: { createdAt: "asc" } } },
     });
     return serializeProject(project);
+  });
+
+  // Archived, not erased: ramps, receipts and webhook history stay. Its keys
+  // stop working at once and queued webhooks fail for want of a URL.
+  app.delete("/v1/dashboard/projects/:id", async (request, reply) => {
+    const { user } = await requireUser(request);
+    const { id } = projectParams.parse(request.params);
+    await ownedProject(user.id, id);
+    const now = new Date();
+    await db().$transaction([
+      db().apiKey.updateMany({ where: { projectId: id, revokedAt: null }, data: { revokedAt: now } }),
+      db().project.update({ where: { id }, data: { archivedAt: now, webhookUrl: null } }),
+    ]);
+    return reply.status(204).send();
   });
 
   // The project's ramps, newest first, one mode at a time (the dashboard's two tabs).

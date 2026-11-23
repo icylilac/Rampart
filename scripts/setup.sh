@@ -13,11 +13,11 @@ else
   echo ".env already exists; left unchanged."
 fi
 
-npm install
-npx prisma generate >/dev/null
+pnpm install
+pnpm exec prisma generate >/dev/null
 echo
 echo "Next:"
-echo "  npm run db:migrate                     # create tables (needs DATABASE_URL)"
-echo "  npm run dev                            # http://localhost:8080/health"
-echo "  npm run preflight -- <G...address>     # is a wallet ready to receive USDC?"
-echo "  npm run anchor:check -- testanchor.stellar.org"
+echo "  pnpm run db:migrate                    # create tables (needs DATABASE_URL)"
+echo "  pnpm run dev                           # http://localhost:8080/health"
+echo "  pnpm run preflight <G...address>       # is a wallet ready to receive USDC?"
+echo "  pnpm run anchor:check testanchor.stellar.org"

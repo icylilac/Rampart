@@ -1,7 +1,7 @@
 /**
  * Look up a ramp session's on-chain receipt, without trusting the service.
  *
- *   npm run receipt:check -- <contract C...> <session-id> [TESTNET|PUBLIC]
+ *   pnpm run receipt:check <contract C...> <session-id> [TESTNET|PUBLIC]
  *
  * Reads the receipt straight from the ramp-receipts contract over Soroban
  * RPC (no key or .env needed), then confirms on Horizon that the delivery
@@ -18,7 +18,7 @@ const NETWORKS = {
 async function main() {
   const [contractId, sessionId, network = "TESTNET"] = process.argv.slice(2);
   if (!contractId || !/^C[A-Z2-7]{55}$/.test(contractId) || !sessionId || !(network in NETWORKS)) {
-    console.error("Usage: npm run receipt:check -- <contract C...> <session-id> [TESTNET|PUBLIC]");
+    console.error("Usage: pnpm run receipt:check <contract C...> <session-id> [TESTNET|PUBLIC]");
     process.exit(2);
   }
   const net = NETWORKS[network as keyof typeof NETWORKS];

@@ -28,28 +28,30 @@ jobs:
       TEST_DATABASE_URL: postgresql://rampart:rampart@localhost:5432/rampart_test?schema=public
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm test
+      - run: pnpm run build
 
   sdk:
     name: SDK (typecheck, tests, build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck -w @rampart/sdk
-      - run: npm run sdk:test
-      - run: npm run sdk:build
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @rampart/sdk typecheck
+      - run: pnpm run sdk:test
+      - run: pnpm run sdk:build
       - name: Both module formats load
         working-directory: packages/sdk
         run: |
@@ -96,13 +98,14 @@ jobs:
         working-directory: site
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: site/package-lock.json
-      - run: npm ci
-      - run: npm run build
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
 
   docker:
     name: Docker image builds

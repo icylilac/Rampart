@@ -6,7 +6,7 @@ export { buildServer };
 
 /**
  * API server. By default it also runs the reconciler and webhook delivery;
- * set WORKER_IN_PROCESS=false and run `npm run worker` to split them.
+ * set WORKER_IN_PROCESS=false and run `pnpm run worker` to split them.
  */
 if (require.main === module) {
   const cfg = config();

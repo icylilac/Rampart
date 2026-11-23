@@ -65,7 +65,7 @@ integration, and hits the same failures:
 Notes:
 - Stripe's Onramp API is in public preview, needs Stripe approval, and serves US (excluding Hawaii) and EU customers.
 - MoonPay requires a **memo** on Stellar deposits. Currency codes (`usdc_xlm`, `xlm`) are configurable; confirm them against your MoonPay account.
-- SEP-24 anchors decide their own fiat rails, KYC and limits. `npm run anchor:check` shows what an anchor supports.
+- SEP-24 anchors decide their own fiat rails, KYC and limits. `pnpm run anchor:check` shows what an anchor supports.
 
 ## Architecture
 
@@ -291,7 +291,7 @@ stored, and signing out revokes it.
 | `DELETE` | `/v1/dashboard/projects/:id/keys/:keyId` | Revoke a key; it stops working immediately |
 | `GET` | `/v1/dashboard/projects/:id/sessions` | The project's ramps, newest first (`mode` `test` or `live`, `limit`, cursor `starting_after`) |
 
-Projects made with `npm run project:create` have no owner and don't appear in
+Projects made with `pnpm run project:create` have no owner and don't appear in
 anyone's dashboard. The site calls the API set in `VITE_RAMPART_API_URL` at
 build time (default `http://localhost:8080`).
 
@@ -389,7 +389,7 @@ sequenceDiagram
   session) is saved as `receipt_error` and not retried.
 - **What projects see:** sessions and `ramp_session.updated` webhooks carry
   `receipt: {contract_id, receipt_id, status, tx_hash, recorded_at, refunded_at}`.
-- **Checking one:** `npm run receipt:check -- <contract> <session-id>` reads the
+- **Checking one:** `pnpm run receipt:check <contract> <session-id>` reads the
   receipt straight from the contract and confirms its transaction on Horizon.
   It needs no key and no `.env`.
 
@@ -397,7 +397,7 @@ Turn it on with `RECEIPTS_CONTRACT_ID` and `RECEIPTS_ATTESTER_SECRET`; it's off
 when they're unset. Testnet deployment: [`CDJK4Y5OLDZJE566HEYRVGBXT4E56EQC2VT6ZP25436M2BX2YRVWKUYT`](https://stellar.expert/explorer/testnet/contract/CDJK4Y5OLDZJE566HEYRVGBXT4E56EQC2VT6ZP25436M2BX2YRVWKUYT).
 
 ```text
-$ npm run receipt:check -- CDJK4Y5O…WKUYT 44a12070-a5d7-4fa3-9a10-af8dc923c1fc
+$ pnpm run receipt:check CDJK4Y5O…WKUYT 44a12070-a5d7-4fa3-9a10-af8dc923c1fc
 Status:       DELIVERED
 Wallet:       GDMKEHJKZSDTINH5DUYMULJIFRECVA7CJYWXGHWFTP2KYOKTL23TSPYG
 Direction:    ON via STRIPE
@@ -491,11 +491,11 @@ erDiagram
 Prerequisites: Node.js **22.12+** and PostgreSQL **14+**.
 
 ```sh
-npm run setup          # .env with a fresh ENCRYPTION_KEY, install, Prisma client
+pnpm run setup         # .env with a fresh ENCRYPTION_KEY, install, Prisma client
 # edit .env: DATABASE_URL, provider keys
-npm run db:migrate     # create tables
-npm run project:create -- --name "My app" --webhook-url https://my-app.example/hooks/ramp
-npm run dev            # http://localhost:8080/health (also runs the worker)
+pnpm run db:migrate    # create tables
+pnpm run project:create --name "My app" --webhook-url https://my-app.example/hooks/ramp
+pnpm run dev           # http://localhost:8080/health (also runs the worker)
 ```
 
 `project:create` prints a live key, a test key and a webhook secret once (or
@@ -511,7 +511,7 @@ curl -s localhost:8080/v1/sessions -H "Authorization: Bearer rk_test_..." \
 ## Self-hosting with Docker
 
 ```sh
-npm run setup                    # creates .env with ENCRYPTION_KEY (fill in provider keys)
+pnpm run setup                   # creates .env with ENCRYPTION_KEY (fill in provider keys)
 docker compose up -d --build     # Postgres, migrations, API on :8080, worker
 docker compose run --rm api node dist/cli/project-create.js --name "My app"
 ```
@@ -543,7 +543,7 @@ Postgres database, both on free plans:
   expiry, verification, webhook delivery) runs one pass per minute instead:
   Supabase's `pg_cron` calls `POST /internal/reconcile` through `pg_net` with
   `Authorization: Bearer <CRON_SECRET>`. Without `CRON_SECRET` set the
-  endpoint answers 404. A long-running `npm run worker` against the same
+  endpoint answers 404. A long-running `pnpm run worker` against the same
   database does the same job every 2 seconds, if you'd rather run one.
 
   ```sql
@@ -561,29 +561,29 @@ Postgres database, both on free plans:
 
 | Command | What it does |
 |---|---|
-| `npm run setup` | First-time setup: `.env` with a generated `ENCRYPTION_KEY`, dependencies, Prisma client |
-| `npm run dev` | Start the API with reload (runs the worker in-process) |
-| `npm run build` / `npm start` | Production build and run |
-| `npm run worker` / `npm run dev:worker` | Run the reconciler and webhook delivery as a separate process |
-| `npm run project:create -- --name ... [--webhook-url ...]` | Create a project with live and test keys and a webhook secret |
-| `npm run typecheck` / `npm test` | TypeScript check / tests (integration tests use `TEST_DATABASE_URL`, or start an embedded Postgres if unset) |
-| `npm run sdk:build` / `npm run sdk:test` | Build / test the SDK |
-| `npm run db:migrate` | Apply database migrations |
-| `npm run preflight -- <G…> [USDC\|XLM] [ON\|OFF] [amount]` | Check whether a wallet can ramp; prints the trustline transaction to sign if one is missing |
-| `npm run anchor:check -- <domain>` | Verify an anchor's SEP-1/10/24 setup and list its deposit/withdraw assets and limits |
-| `npm run receipt:check -- <C…> <session-id> [TESTNET\|PUBLIC]` | Read a session's on-chain receipt and confirm its delivery transaction (no key needed) |
+| `pnpm run setup` | First-time setup: `.env` with a generated `ENCRYPTION_KEY`, dependencies, Prisma client |
+| `pnpm run dev` | Start the API with reload (runs the worker in-process) |
+| `pnpm run build` / `pnpm start` | Production build and run |
+| `pnpm run worker` / `pnpm run dev:worker` | Run the reconciler and webhook delivery as a separate process |
+| `pnpm run project:create --name ... [--webhook-url ...]` | Create a project with live and test keys and a webhook secret |
+| `pnpm run typecheck` / `pnpm test` | TypeScript check / tests (integration tests use `TEST_DATABASE_URL`, or start an embedded Postgres if unset) |
+| `pnpm run sdk:build` / `pnpm run sdk:test` | Build / test the SDK |
+| `pnpm run db:migrate` | Apply database migrations |
+| `pnpm run preflight <G…> [USDC\|XLM] [ON\|OFF] [amount]` | Check whether a wallet can ramp; prints the trustline transaction to sign if one is missing |
+| `pnpm run anchor:check <domain>` | Verify an anchor's SEP-1/10/24 setup and list its deposit/withdraw assets and limits |
+| `pnpm run receipt:check <C…> <session-id> [TESTNET\|PUBLIC]` | Read a session's on-chain receipt and confirm its delivery transaction (no key needed) |
 | `cd contracts && cargo test` | Contract tests (`stellar contract build` for the WASM) |
 
 Example on testnet:
 
 ```text
-$ npm run preflight -- GC2ITVMY…MPGLNO USDC ON 25
+$ pnpm run preflight GC2ITVMY…MPGLNO USDC ON 25
 XLM:     9998.8780074 (minimum 1.5000000, spendable 9997.8780074)
 ✗ Not ready:
   - [missing_trustline] The account has no trustline for USDC, so USDC cannot be delivered to it.
     Sign and submit this XDR to add the trustline: AAAAAgAAAAC0idWY…
 
-$ npm run anchor:check -- testanchor.stellar.org
+$ pnpm run anchor:check testanchor.stellar.org
 SEP-10 auth:     https://testanchor.stellar.org/auth
 SEP-24 server:   https://testanchor.stellar.org/sep24
 deposit          SRT (1–10), native (1–10), USDC (1–10)

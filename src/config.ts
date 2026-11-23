@@ -106,7 +106,7 @@ const baseSchema = z.object({
 
   /**
    * Run the reconciler and webhook delivery inside the API process. Set to
-   * "false" when running `npm run worker` separately (e.g. docker-compose).
+   * "false" when running `pnpm run worker` separately (e.g. docker-compose).
    */
   WORKER_IN_PROCESS: z
     .string()

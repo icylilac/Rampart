@@ -1,7 +1,7 @@
 /**
  * Is a Stellar wallet ready to ramp?
  *
- *   npm run preflight -- <G...address> [USDC|XLM] [ON|OFF] [amount]
+ *   pnpm run preflight <G...address> [USDC|XLM] [ON|OFF] [amount]
  *
  * Reports account existence, XLM reserves, trustline status and, when a
  * trustline is missing, prints the unsigned changeTrust XDR to sign.
@@ -13,7 +13,7 @@ import { preflight } from "../src/stellar/preflight";
 async function main() {
   const [wallet, assetCode = "USDC", direction = "ON", amount] = process.argv.slice(2);
   if (!wallet || !/^G[A-Z2-7]{55}$/.test(wallet)) {
-    console.error("Usage: npm run preflight -- <G...address> [USDC|XLM] [ON|OFF] [amount]");
+    console.error("Usage: pnpm run preflight <G...address> [USDC|XLM] [ON|OFF] [amount]");
     process.exit(2);
   }
   if (direction !== "ON" && direction !== "OFF") throw new Error("direction must be ON or OFF");

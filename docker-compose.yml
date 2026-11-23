@@ -1,6 +1,6 @@
 # Self-hosted Rampart: Postgres, a one-off migration, the API and a worker.
 #
-#   npm run setup                 # creates .env with a fresh ENCRYPTION_KEY
+#   pnpm run setup                # creates .env with a fresh ENCRYPTION_KEY
 #   docker compose up -d --build
 #   docker compose run --rm api node dist/cli/project-create.js --name "My app"
 #

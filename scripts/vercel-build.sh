@@ -1,16 +1,16 @@
 #!/bin/sh
 # Build step for the API on Vercel (see vercel.json).
 set -e
-npx prisma generate
+pnpm exec prisma generate
 # Only production deploys migrate: a PR preview must never change the live
 # database's schema. Migrations need a session connection, not Supabase's
 # transaction pooler, so they go over DIRECT_URL when it is set.
 if [ "$VERCEL_ENV" = "production" ]; then
-  DATABASE_URL="${DIRECT_URL:-$DATABASE_URL}" npx prisma migrate deploy
+  DATABASE_URL="${DIRECT_URL:-$DATABASE_URL}" pnpm exec prisma migrate deploy
 fi
 # One CommonJS file with the dependencies inlined (see api/index.js). Prisma
 # stays external: its query engine is a native file Vercel traces and ships.
-npx esbuild src/vercel.ts --bundle --platform=node --target=node22 --format=cjs \
+pnpm exec esbuild src/vercel.ts --bundle --platform=node --target=node22 --format=cjs \
   --outfile=dist-vercel/handler.js --external:@prisma/client --external:.prisma --external:sodium-native --log-level=warning
 # Vercel wants a non-empty output directory; the API itself is the function in api/.
 mkdir -p public

@@ -8,6 +8,7 @@
   "engines": {
     "node": ">=22.12"
   },
+  "packageManager": "pnpm@10.34.9",
   "scripts": {
     "setup": "bash scripts/setup.sh",
     "dev": "tsx watch src/main.ts",
@@ -24,8 +25,8 @@
     "dev:worker": "tsx watch src/worker.ts",
     "test": "vitest run",
     "project:create": "tsx src/cli/project-create.ts",
-    "sdk:build": "npm run build -w @rampart/sdk",
-    "sdk:test": "npm test -w @rampart/sdk"
+    "sdk:build": "pnpm --filter @rampart/sdk build",
+    "sdk:test": "pnpm --filter @rampart/sdk test"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.1",
@@ -42,11 +43,5 @@
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^4.1.12"
-  },
-  "overrides": {
-    "deepmerge-ts": "^8.0.2"
-  },
-  "workspaces": [
-    "packages/*"
-  ]
+  }
 }

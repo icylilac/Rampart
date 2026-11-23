@@ -51,13 +51,13 @@ flowchart LR
 Requires Node.js 22.12+ and PostgreSQL 14+.
 
 ```sh
-npm run setup                                  # .env, dependencies, Prisma client
-npm run db:migrate
-npm run dev                                    # http://localhost:8080
-cd site && npm install && npm run dev          # dashboard at http://localhost:5173/signup
+pnpm run setup                                 # .env, dependencies, Prisma client
+pnpm run db:migrate
+pnpm run dev                                   # http://localhost:8080
+cd site && pnpm install && pnpm run dev         # dashboard at http://localhost:5173/signup
 ```
 
-Create a project in the dashboard to get live and test API keys, or from the command line with `npm run project:create -- --name "My app"`.
+Create a project in the dashboard to get live and test API keys, or from the command line with `pnpm run project:create --name "My app"`.
 
 Or with Docker: `docker compose up -d --build`.
 
@@ -88,7 +88,7 @@ const session = await ramp.sessions.create({
 | `src/` | API, session engine, reconciler, provider adapters, Stellar checks |
 | `packages/sdk/` | `@rampart/sdk` TypeScript SDK ([docs](packages/sdk/README.md)) |
 | `contracts/ramp-receipts/` | Soroban receipts contract ([docs](contracts/README.md)) |
-| `site/` | Website (React + Vite): `cd site && npm install && npm run dev` |
+| `site/` | Website (React + Vite): `cd site && pnpm install && pnpm run dev` |
 | `docs/reference.md` | Full reference: API, flows, statuses, data model, security, config |
 
 ## Status

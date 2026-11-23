@@ -8,7 +8,7 @@ import { webhookUrlProblem } from "../lib/webhook-target";
  * The secrets are printed once and only their hashes are stored.
  * (Signed-in users can do the same from the dashboard.)
  *
- *   npm run project:create -- --name "My app" [--webhook-url https://example.com/hooks/ramp]
+ *   pnpm run project:create --name "My app" [--webhook-url https://example.com/hooks/ramp]
  *   docker compose run --rm api node dist/cli/project-create.js --name "My app"
  */
 function arg(name: string): string | undefined {
@@ -20,7 +20,7 @@ async function main() {
   const name = arg("name");
   const webhookUrl = arg("webhook-url");
   if (!name) {
-    console.error('Usage: npm run project:create -- --name "My app" [--webhook-url https://...]');
+    console.error('Usage: pnpm run project:create --name "My app" [--webhook-url https://...]');
     process.exit(1);
   }
   const problem = webhookUrl ? webhookUrlProblem(webhookUrl, config().NODE_ENV === "development") : null;

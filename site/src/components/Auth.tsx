@@ -253,7 +253,7 @@ export function LoginPage({ next, notice }: { next: string; notice?: string }) {
 export function SignupPage({ next }: { next: string }) {
   return (
     <AuthPage>
-      <AuthCard title="Create your account" description="Sign up with Google, GitHub or email. No wallet needed to get test keys.">
+      <AuthCard title="Create your account" description="Get your API keys in a minute. No wallet needed for test keys.">
         <OAuthButtons next={next} />
         <EmailForm mode="sign-up" next={next} />
         <WalletOption next={next} />

@@ -9,7 +9,22 @@ import { ApiError } from "./errors";
 
 export type SupabaseUser = { id: string; email: string };
 
-type UserResponse = { id?: string; email?: string | null; email_confirmed_at?: string | null };
+type AppMetadata = { provider?: string; wallet_address?: string };
+type UserResponse = { id?: string; email?: string | null; email_confirmed_at?: string | null; app_metadata?: AppMetadata };
+
+/**
+ * Only the server, with the service-role key, can set app_metadata. A user on
+ * the wallet email domain without it was signed up by someone else to squat
+ * on a wallet's placeholder address.
+ */
+function serverMadeWalletUser(meta: AppMetadata | undefined, address?: string): boolean {
+  if (meta?.provider !== "stellar" || typeof meta.wallet_address !== "string") return false;
+  return address === undefined || meta.wallet_address === address;
+}
+
+function isWalletEmail(email: string): boolean {
+  return email.toLowerCase().endsWith(`@${config().WALLET_EMAIL_DOMAIN.toLowerCase()}`);
+}
 
 export async function supabaseUser(accessToken: string): Promise<SupabaseUser> {
   const cfg = config();
@@ -32,10 +47,13 @@ export async function supabaseUser(accessToken: string): Promise<SupabaseUser> {
   if (!user.email || !user.email_confirmed_at) {
     throw new ApiError(403, "email_unconfirmed", "Confirm your email address first, using the link we sent you.");
   }
+  if (isWalletEmail(user.email) && !serverMadeWalletUser(user.app_metadata)) {
+    throw new ApiError(403, "invalid_login", "This email address is reserved. Sign in with your wallet instead.");
+  }
   return { id: user.id, email: user.email.toLowerCase() };
 }
 
-type AdminUser = { id?: string; email?: string };
+type AdminUser = { id?: string; email?: string; app_metadata?: AppMetadata };
 
 /**
  * The Supabase Auth user standing for a Stellar wallet, created on first use
@@ -70,7 +88,8 @@ export async function walletAuthUserId(address: string): Promise<string | null> 
     if (found.ok) {
       const { users = [] } = (await found.json()) as { users?: AdminUser[] };
       const user = users.find((u) => u.email === email);
-      if (user?.id) return user.id;
+      if (user?.id && serverMadeWalletUser(user.app_metadata, address)) return user.id;
+      if (user?.id) throw new Error(`Supabase user ${user.id} has wallet ${address}'s placeholder email but wasn't made by Rampart; refusing to link it`);
     }
   }
   throw new Error(`Supabase admin returned ${created.status}`);

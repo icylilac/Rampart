@@ -127,8 +127,36 @@ describe("Supabase Auth sign-in", () => {
     const id = randomUUID();
     // The earlier attempt may have created it after all: 422, then found by email.
     supabase((url, init) =>
-      init?.method === "POST" ? { status: 422, body: { error_code: "email_exists" } } : { status: 200, body: { users: [{ id, email: decodeURIComponent(url.searchParams.get("filter")!) }] } },
+      init?.method === "POST" ? { status: 422, body: { error_code: "email_exists" } } : {
+            status: 200,
+            body: { users: [{ id, email: decodeURIComponent(url.searchParams.get("filter")!), app_metadata: { provider: "stellar", wallet_address: kp.publicKey() } }] },
+          },
     );
     expect((await walletSignIn(kp)).json().user.supabase_user_id).toBe(id);
+  });
+
+  it("won't link a wallet to a Supabase user someone else signed up with its placeholder email", async () => {
+    const kp = Keypair.random();
+    const squatter = randomUUID();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    // The attacker signed up `<address>@wallet.rampartpay.xyz` themselves: no app_metadata.
+    supabase((url, init) =>
+      init?.method === "POST"
+        ? { status: 422, body: { error_code: "email_exists" } }
+        : { status: 200, body: { users: [{ id: squatter, email: decodeURIComponent(url.searchParams.get("filter")!), app_metadata: { provider: "email" } }] } },
+    );
+    const res = await walletSignIn(kp);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().user.supabase_user_id).toBeNull();
+    expect(await db().user.count({ where: { authUserId: squatter } })).toBe(0);
+  });
+
+  it("refuses a Supabase sign-in on the wallet email domain unless Rampart made the user", async () => {
+    const kp = Keypair.random();
+    const email = `${kp.publicKey().toLowerCase()}@wallet.rampartpay.xyz`;
+    supabase(() => ({ status: 200, body: { ...authUser(email), app_metadata: { provider: "email" } } }));
+    const res = await exchange();
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error.code).toBe("invalid_login");
   });
 });

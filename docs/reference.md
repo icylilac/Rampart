@@ -281,6 +281,8 @@ stored, and signing out revokes it.
 | `POST` | `/v1/auth/wallet` | Sign in with the signed challenge (`address`, `token`, `signature`) |
 | `GET` | `/v1/auth/me` | The signed-in user, with its `supabase_user_id` |
 | `POST` | `/v1/auth/logout` | End the session |
+| `POST` | `/v1/auth/logout-all` | End every session of the account |
+| `POST` | `/v1/account/wallet` | Link a wallet to the signed-in account (`address`, `token`, `signature` from a wallet challenge); refused if the wallet has its own account |
 | `GET` | `/v1/dashboard/projects` | The user's projects and their keys (prefixes only) |
 | `POST` | `/v1/dashboard/projects` | New project (`name`, optional `webhook_url`); returns the live key, test key and webhook secret once |
 | `PATCH` | `/v1/dashboard/projects/:id` | Rename (`name`) or change the `webhook_url` (`null` removes it) |

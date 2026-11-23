@@ -37,36 +37,9 @@ export function DashboardPage() {
     void load();
   }, [load]);
 
-  async function signOut() {
-    await api("/v1/auth/logout", { method: "POST" }).catch(() => undefined);
-    setToken(null);
-    navigate("/login", { replace: true });
-  }
-
-  const who = user ? (user.email ?? shortAddress(user.wallet_address ?? "")) : "";
-
   return (
     <div className="page dash">
-      <header className="nav box dash-nav">
-        <Link to="/" className="nav-brand" aria-label="Rampart home">
-          <img src="/icon.svg" alt="" />
-          <span>Rampart</span>
-        </Link>
-        <div className="nav-right">
-          {user && (
-            <span className="dash-who mono-label" title={user.email ?? user.wallet_address ?? ""}>
-              {user.wallet_address && !user.email && <Icon name="wallet" />}
-              {who}
-            </span>
-          )}
-          <a className="btn btn-outline hide-sm" href={DOCS} target="_blank" rel="noreferrer">
-            Docs
-          </a>
-          <button className="btn btn-solid" onClick={() => void signOut()}>
-            Sign out
-          </button>
-        </div>
-      </header>
+      <DashNav user={user} />
 
       <main>
         <section className="box section dash-head">
@@ -127,6 +100,39 @@ export function DashboardPage() {
         <span className="mono-label">Secrets are shown once · Keys are stored as hashes</span>
       </footer>
     </div>
+  );
+}
+
+export async function signOut(everywhere = false) {
+  await api(everywhere ? "/v1/auth/logout-all" : "/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+  setToken(null);
+  navigate("/login", { replace: true });
+}
+
+/** The signed-in header: who you are (links to your account), docs, sign out. */
+export function DashNav({ user }: { user: User | null }) {
+  const who = user ? (user.email ?? shortAddress(user.wallet_address ?? "")) : "";
+  return (
+    <header className="nav box dash-nav">
+      <Link to="/dashboard" className="nav-brand" aria-label="Rampart dashboard">
+        <img src="/icon.svg" alt="" />
+        <span>Rampart</span>
+      </Link>
+      <div className="nav-right">
+        {user && (
+          <Link to="/account" className="dash-who mono-label" title={`Account: ${user.email ?? user.wallet_address ?? ""}`}>
+            {user.wallet_address && !user.email && <Icon name="wallet" />}
+            {who}
+          </Link>
+        )}
+        <a className="btn btn-outline hide-sm" href={DOCS} target="_blank" rel="noreferrer">
+          Docs
+        </a>
+        <button className="btn btn-solid" onClick={() => void signOut()}>
+          Sign out
+        </button>
+      </div>
+    </header>
   );
 }
 

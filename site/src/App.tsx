@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AccountPage } from "./components/Account";
 import { ForgotPasswordPage, LoginPage, OAuthCallbackPage, ResetPasswordPage, SignupPage } from "./components/Auth";
 import { CodeTabs } from "./components/CodeTabs";
 import { DashboardPage } from "./components/Dashboard";
@@ -31,6 +32,7 @@ const TITLES: Record<string, string> = {
   "/login": "Sign in · Rampart",
   "/signup": "Create account · Rampart",
   "/dashboard": "Dashboard · Rampart",
+  "/account": "Account · Rampart",
   "/auth/callback": "Signing in · Rampart",
   "/forgot": "Reset password · Rampart",
   "/auth/reset": "New password · Rampart",
@@ -43,7 +45,11 @@ export function App() {
   const next = safeNext(search.get("next"));
   // Signed-in users skip the auth pages; signed-out users can't open the dashboard.
   const redirect =
-    (path === "/login" || path === "/signup") && signedIn ? next : path === "/dashboard" && !signedIn ? "/login?next=/dashboard" : null;
+    (path === "/login" || path === "/signup") && signedIn
+      ? next
+      : (path === "/dashboard" || path === "/account") && !signedIn
+        ? `/login?next=${path}`
+        : null;
 
   useEffect(() => {
     if (redirect) navigate(redirect, { replace: true });
@@ -59,6 +65,7 @@ export function App() {
   if (path === "/forgot") return <ForgotPasswordPage />;
   if (path === "/auth/reset") return <ResetPasswordPage />;
   if (path === "/dashboard") return <DashboardPage />;
+  if (path === "/account") return <AccountPage />;
   return <Home signedIn={signedIn} />;
 }
 

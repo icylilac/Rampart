@@ -33,14 +33,43 @@ export const walletChallenge = (address: string): WalletChallenge => createWalle
 
 /** Verifies the signed challenge, then signs in the wallet's account, creating it on first use. */
 export async function walletSignIn(address: string, token: string, signature: string): Promise<SignedIn> {
+  assertWalletProof(address, token, signature);
+  const user = await linkWalletAuthUser(await walletUser(address));
+  return startSession(user, "wallet");
+}
+
+function assertWalletProof(address: string, token: string, signature: string) {
   const proof = verifyWalletChallenge({ address, token, signature }, challengeSecret());
   if (!proof.ok) {
     throw proof.reason === "expired"
       ? new ApiError(401, "challenge_expired", "The sign-in request expired. Connect your wallet again.")
       : new ApiError(401, "invalid_signature", "The wallet signature could not be verified.");
   }
-  const user = await linkWalletAuthUser(await walletUser(address));
-  return startSession(user, "wallet");
+}
+
+/**
+ * Adds a proven wallet to a signed-in account, so either way of signing in
+ * opens the same account. A wallet that already has its own account can't be
+ * added: that would leave its projects behind.
+ */
+export async function linkWallet(user: User, address: string, token: string, signature: string): Promise<User> {
+  assertWalletProof(address, token, signature);
+  if (user.walletAddress === address) return user;
+  if (user.walletAddress) throw new ApiError(409, "wallet_already_linked", "This account already has a wallet.");
+  const taken = () => new ApiError(409, "wallet_taken", "That wallet already has its own Rampart account. Sign in with it instead.");
+  if (await db().user.findUnique({ where: { walletAddress: address } })) throw taken();
+  try {
+    return await db().user.update({ where: { id: user.id }, data: { walletAddress: address } });
+  } catch (e) {
+    if (isUniqueViolation(e)) throw taken();
+    throw e;
+  }
+}
+
+/** Ends every session of the account, on every device. */
+export async function signOutEverywhere(userId: string): Promise<number> {
+  const { count } = await db().userSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+  return count;
 }
 
 async function walletUser(address: string): Promise<User> {

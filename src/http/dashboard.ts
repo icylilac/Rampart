@@ -2,7 +2,7 @@ import type { ApiKey, Prisma, Project, User } from "@prisma/client";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { config } from "../config";
-import { signOut, supabaseSignIn, walletChallenge, walletSignIn, type SignedIn } from "../engine/accounts";
+import { linkWallet, signOut, signOutEverywhere, supabaseSignIn, walletChallenge, walletSignIn, type SignedIn } from "../engine/accounts";
 import { supabaseUser } from "../lib/supabase-auth";
 import { addApiKey, createProject } from "../engine/projects";
 import { serializeSession } from "../engine/serialize";
@@ -118,6 +118,18 @@ export function dashboardRoutes(app: FastifyInstance) {
   app.post("/v1/auth/logout", async (request, reply) => {
     await signOut((await requireUser(request)).sessionId);
     return reply.status(204).send();
+  });
+
+  app.post("/v1/auth/logout-all", async (request, reply) => {
+    await signOutEverywhere((await requireUser(request)).user.id);
+    return reply.status(204).send();
+  });
+
+  // ---------------------------------------------------------------- account
+  app.post("/v1/account/wallet", authLimit, async (request) => {
+    const { user } = await requireUser(request);
+    const b = walletBody.parse(request.body);
+    return serializeUser(await linkWallet(user, b.address, b.token, b.signature));
   });
 
   // ---------------------------------------------------------------- projects and keys

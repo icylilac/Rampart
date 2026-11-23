@@ -1,4 +1,4 @@
-import { api, setToken, type SignedIn } from "./api";
+import { api, setToken, type SignedIn, type User } from "./api";
 
 /**
  * Wallet sign-in, the same path as Doqtri's: ask the API for a one-time
@@ -6,6 +6,19 @@ import { api, setToken, type SignedIn } from "./api";
  * trade the signature for a session.
  */
 export async function walletSignIn(): Promise<SignedIn> {
+  const proof = await proveWallet();
+  const session = await api<SignedIn>("/v1/auth/wallet", { body: proof });
+  setToken(session.token);
+  return session;
+}
+
+/** Adds the wallet to the signed-in account, so it signs in to this account too. */
+export async function linkWalletToAccount(): Promise<User> {
+  return api<User>("/v1/account/wallet", { body: await proveWallet() });
+}
+
+/** Has the wallet sign a one-time challenge for its address. */
+async function proveWallet(): Promise<{ address: string; token: string; signature: string }> {
   // Loaded on click, so the landing page doesn't ship the wallet code.
   const freighter = await import("@stellar/freighter-api");
 
@@ -22,10 +35,7 @@ export async function walletSignIn(): Promise<SignedIn> {
   const signed = await freighter.signMessage(challenge.message, { address });
   if (signed.error || !signed.signedMessage) throw new Error(signed.error?.message ?? "Signing was cancelled.");
   const signature = typeof signed.signedMessage === "string" ? signed.signedMessage : toBase64(signed.signedMessage);
-
-  const session = await api<SignedIn>("/v1/auth/wallet", { body: { address, token: challenge.token, signature } });
-  setToken(session.token);
-  return session;
+  return { address, token: challenge.token, signature };
 }
 
 function toBase64(bytes: Uint8Array): string {

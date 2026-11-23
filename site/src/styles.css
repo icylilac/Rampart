@@ -283,6 +283,20 @@ main > .box + .box { border-top: 0; }
 .link-btn.danger { color: #B42318; }
 .link-btn:disabled { opacity: .5; cursor: default; }
 
+/* Account */
+.back-link { text-decoration: none; color: var(--muted); }
+.back-link:hover { color: var(--ink); }
+.account { display: grid; gap: 18px; }
+.account h2 { font-size: 22px; }
+.account-list { display: grid; gap: 0; margin: 0; border: 1px solid var(--line); }
+.account-list > div { display: grid; grid-template-columns: 180px 1fr; gap: 16px; align-items: center; padding: 14px 16px; border-top: 1px solid var(--line); }
+.account-list > div:first-child { border-top: 0; }
+.account-list dd { margin: 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.account-code { font-size: 13px; overflow-wrap: anywhere; }
+.account-hint { margin: 0; padding: 0 16px 14px; }
+a.dash-who { text-decoration: none; }
+a.dash-who:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+
 /* Ramps */
 .ramps { display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 18px; }
 .ramps-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -374,6 +388,7 @@ main > .box + .box { border-top: 0; }
   .ramp-row { grid-template-columns: 1fr auto; gap: 6px 12px; }
   .ramp-what { grid-column: 1 / -1; grid-row: 2; }
   .ramp-wallet { display: none; }
+  .account-list > div { grid-template-columns: 1fr; gap: 6px; }
   .secret dd { flex-wrap: wrap; }
   .secret dd .btn { flex: 1 1 100%; }
 }

@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { Keypair } from "@stellar/stellar-sdk";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildServer } from "../src/app";
+import { sha256Hex } from "../src/lib/crypto";
 import { db } from "../src/lib/db";
 import { CHALLENGE_TTL_MS, createWalletChallenge, verifyWalletChallenge } from "../src/lib/wallet-challenge";
 
@@ -204,6 +206,46 @@ describe("dashboard API", () => {
     expect((await app.inject({ method: "PATCH", url, headers: bearer(owner.token), payload: { name: "Back" } })).statusCode).toBe(404);
     expect((await app.inject({ method: "DELETE", url, headers: bearer(owner.token) })).statusCode).toBe(404);
     expect(await db().project.count({ where: { id: created.project.id } })).toBe(1);
+  });
+
+  it("links a wallet to an email account once, and refuses a wallet with its own account", async () => {
+    // An email account, signed in, as a Supabase sign-in would leave it.
+    const emailUser = await db().user.create({ data: { email: `link-${randomUUID()}@example.com` } });
+    const emailToken = `rds_${randomUUID().replace(/-/g, "")}`;
+    await db().userSession.create({ data: { userId: emailUser.id, tokenHash: sha256Hex(emailToken), method: "supabase", expiresAt: new Date(Date.now() + 86_400_000) } });
+    const proofFor = async (kp: Keypair) => {
+      const c = (await app.inject({ method: "POST", url: "/v1/auth/wallet/challenge", payload: { address: kp.publicKey() } })).json();
+      return { address: kp.publicKey(), token: c.token, signature: sign(kp, c.message) };
+    };
+    const link = async (token: string, payload: object) => app.inject({ method: "POST", url: "/v1/account/wallet", headers: bearer(token), payload });
+
+    // A wallet with its own account can't be taken over.
+    const kpTaken = Keypair.random();
+    await walletSignIn(kpTaken);
+    expect((await link(emailToken, await proofFor(kpTaken))).json().error.code).toBe("wallet_taken");
+
+    // A forged signature is refused.
+    const kp = Keypair.random();
+    const forged = { ...(await proofFor(kp)), signature: sign(Keypair.random(), "nope") };
+    expect((await link(emailToken, forged)).statusCode).toBe(401);
+
+    // A fresh wallet links, and then signs in to the same account.
+    const linked = await link(emailToken, await proofFor(kp));
+    expect(linked.statusCode).toBe(200);
+    expect(linked.json()).toMatchObject({ id: emailUser.id, wallet_address: kp.publicKey() });
+    expect((await walletSignIn(kp)).json().user.id).toBe(emailUser.id);
+
+    // One wallet per account.
+    expect((await link(emailToken, await proofFor(Keypair.random()))).json().error.code).toBe("wallet_already_linked");
+  });
+
+  it("signs out every session of the account", async () => {
+    const kp = Keypair.random();
+    const a = (await walletSignIn(kp)).json().token;
+    const b = (await walletSignIn(kp)).json().token;
+    expect((await app.inject({ method: "POST", url: "/v1/auth/logout-all", headers: bearer(a) })).statusCode).toBe(204);
+    expect((await app.inject({ url: "/v1/auth/me", headers: bearer(a) })).statusCode).toBe(401);
+    expect((await app.inject({ url: "/v1/auth/me", headers: bearer(b) })).statusCode).toBe(401);
   });
 
   it("needs a signed-in user, not an API key, for the dashboard", async () => {

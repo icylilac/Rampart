@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, navigate, withNext } from "../lib/router";
-import { emailSignIn, emailSignUp, finishCallback, OAUTH_PROVIDERS, oauthSignIn, SUPABASE_READY, type OAuthProvider } from "../lib/supabase";
+import { emailSignIn, emailSignUp, enabledProviders, finishCallback, OAUTH_PROVIDERS, oauthSignIn, type OAuthProvider } from "../lib/supabase";
 import { walletSignIn } from "../lib/wallet";
 import { Icon } from "./Icon";
 
@@ -118,7 +118,16 @@ export function EmailForm({ mode, next }: { mode: "sign-in" | "sign-up"; next: s
 export function OAuthButtons({ next }: { next: string }) {
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
-  if (!SUPABASE_READY) return null;
+  const [enabled, setEnabled] = useState<OAuthProvider[]>([]);
+  useEffect(() => {
+    let live = true;
+    void enabledProviders().then((ids) => live && setEnabled(ids));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const providers = OAUTH_PROVIDERS.filter((p) => enabled.includes(p.id));
+  if (providers.length === 0) return null;
 
   async function go(provider: OAuthProvider) {
     setBusy(provider);
@@ -134,7 +143,7 @@ export function OAuthButtons({ next }: { next: string }) {
   return (
     <>
       <div className="oauth-buttons">
-        {OAUTH_PROVIDERS.map((p) => (
+        {providers.map((p) => (
           <button key={p.id} type="button" className="btn btn-outline btn-block" disabled={busy !== null} onClick={() => void go(p.id)}>
             <Icon name={p.id} />
             {busy === p.id ? "Redirecting…" : p.label}

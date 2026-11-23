@@ -20,6 +20,18 @@ export const OAUTH_PROVIDERS = [
 ] as const;
 export type OAuthProvider = (typeof OAUTH_PROVIDERS)[number]["id"];
 
+/** The providers switched on in Supabase (Authentication -> Sign In / Providers), so the site never shows a dead button. */
+export async function enabledProviders(): Promise<OAuthProvider[]> {
+  if (!URL_ || !ANON_KEY) return [];
+  try {
+    const res = await fetch(`${URL_}/auth/v1/settings`, { headers: { apikey: ANON_KEY } });
+    const external = ((await res.json()) as { external?: Record<string, boolean> }).external ?? {};
+    return OAUTH_PROVIDERS.map((p) => p.id).filter((id) => external[id]);
+  } catch {
+    return [];
+  }
+}
+
 const NEXT_KEY = "rampart.next";
 const callbackUrl = () => `${window.location.origin}/auth/callback`;
 

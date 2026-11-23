@@ -221,7 +221,7 @@ export function WalletOption({ next }: { next: string }) {
       </div>
       <button type="button" className="btn btn-outline btn-block" disabled={busy} onClick={() => void connect()}>
         <Icon name="wallet" />
-        {busy ? "Check Freighter…" : "Use Freighter wallet"}
+        {busy ? "Check Varial…" : "Use Varial wallet"}
       </button>
       {error && (
         <p role="alert" className="form-error">

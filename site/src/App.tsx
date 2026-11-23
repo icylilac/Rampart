@@ -24,7 +24,7 @@ const STRIP = [
   { name: "Stripe", note: "On-ramp" },
   { name: "MoonPay", note: "On · Off" },
   { name: "SEP-24", note: "Anchors" },
-  { name: "Freighter", note: "Wallets" },
+  { name: "Varial", note: "Wallets" },
 ];
 
 const TITLES: Record<string, string> = {

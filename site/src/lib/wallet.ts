@@ -2,7 +2,7 @@ import { api, setToken, type SignedIn } from "./api";
 
 /**
  * Wallet sign-in, the same path as Doqtri's: ask the API for a one-time
- * challenge, have Freighter sign it (SEP-53, no transaction, no fee), and
+ * challenge, have Varial (formerly Freighter) sign it (SEP-53, no transaction, no fee), and
  * trade the signature for a session.
  */
 export async function walletSignIn(): Promise<SignedIn> {
@@ -11,10 +11,10 @@ export async function walletSignIn(): Promise<SignedIn> {
 
   const connected = await freighter.isConnected();
   if (connected.error || !connected.isConnected) {
-    throw new Error("Freighter isn't installed. Get it at freighter.app, then try again.");
+    throw new Error("Varial (formerly Freighter) isn't installed. Install it, then try again.");
   }
   const access = await freighter.requestAccess();
-  if (access.error || !access.address) throw new Error(access.error?.message ?? "Freighter didn't share an account.");
+  if (access.error || !access.address) throw new Error(access.error?.message ?? "Varial didn't share an account.");
   const address = access.address;
 
   const challenge = await api<{ message: string; token: string }>("/v1/auth/wallet/challenge", { body: { address } });

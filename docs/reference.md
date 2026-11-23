@@ -337,7 +337,7 @@ as `sandbox.simulating`.
 [`@rampart/sdk`](../packages/sdk/README.md) (in `packages/sdk`, no runtime dependencies):
 
 - **Server** (`@rampart/sdk`): typed client for every endpoint above, retries for safe requests, `listAll()` pagination, `Rampart.webhooks.constructEvent()`, and sandbox helpers.
-- **Browser** (`@rampart/sdk/browser`): `RampRunner` follows a session with its client secret and performs each `next_action`: opens the provider page, mounts Stripe's onramp widget, or has the wallet sign (`stellarWalletsKitSigner` adapts Stellar Wallets Kit: Freighter, xBull, Albedo and others).
+- **Browser** (`@rampart/sdk/browser`): `RampRunner` follows a session with its client secret and performs each `next_action`: opens the provider page, mounts Stripe's onramp widget, or has the wallet sign (`stellarWalletsKitSigner` adapts Stellar Wallets Kit: Varial (formerly Freighter), xBull, Albedo and others).
 
 ```ts
 // server

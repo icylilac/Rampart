@@ -91,6 +91,45 @@ export async function oauthSignIn(provider: OAuthProvider, next: string): Promis
   if (error) throw new Error(friendly(error.message));
 }
 
+/** Emails a password reset link that comes back to /auth/reset. Supabase answers the same whether or not the email has an account. */
+export async function sendPasswordReset(email: string): Promise<void> {
+  const sb = await supabase();
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/reset` });
+  if (error) throw new Error(friendly(error.message));
+}
+
+let recovery: { sb: SupabaseClient; session: Session } | null = null;
+
+/** On /auth/reset: trades the link's one-time code for a short recovery session. */
+export async function openPasswordReset(): Promise<void> {
+  const query = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  const failure = query.get("error_description") ?? hash.get("error_description");
+  if (failure) throw new Error(failure.replace(/\+/g, " "));
+  const code = query.get("code");
+  if (!code) throw new Error("That reset link is incomplete. Ask for a new one.");
+  const sb = await supabase();
+  const { data, error } = await sb.auth.exchangeCodeForSession(code);
+  if (error) {
+    throw new Error(
+      /code verifier|invalid flow state/i.test(error.message)
+        ? "Open the reset link in the browser you asked for it from, or ask for a new one."
+        : "That reset link has expired or was already used. Ask for a new one.",
+    );
+  }
+  recovery = { sb, session: data.session };
+}
+
+/** Sets the new password, then signs in to Rampart. */
+export async function setNewPassword(password: string): Promise<void> {
+  if (!recovery) throw new Error("That reset link has expired. Ask for a new one.");
+  const { sb, session } = recovery;
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) throw new Error(friendly(error.message));
+  recovery = null;
+  await finish(sb, session);
+}
+
 /** On /auth/callback, after Google/GitHub or an email confirmation link: returns where to go next. */
 export async function finishCallback(): Promise<string> {
   const query = new URLSearchParams(window.location.search);

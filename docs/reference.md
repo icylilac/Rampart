@@ -296,7 +296,8 @@ To set up Supabase Auth:
    (server only; it's what creates wallet users). **Site:** `VITE_SUPABASE_URL`
    and `VITE_SUPABASE_ANON_KEY`. Without them only wallets can sign in.
 2. **Authentication → URL Configuration:** the site URL, and
-   `https://<site>/auth/callback` in the redirect URLs.
+   `https://<site>/auth/callback` and `https://<site>/auth/reset` (password
+   reset links) in the redirect URLs.
 3. **Authentication → Sign In / Providers:** Email is on by default. For Google
    and GitHub, add each one's OAuth client ID and secret; their callback URL is
    `https://<ref>.supabase.co/auth/v1/callback`.

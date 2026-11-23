@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, navigate, withNext } from "../lib/router";
-import { emailSignIn, emailSignUp, enabledProviders, finishCallback, OAUTH_PROVIDERS, oauthSignIn, type OAuthProvider } from "../lib/supabase";
+import {
+  emailSignIn,
+  emailSignUp,
+  enabledProviders,
+  finishCallback,
+  OAUTH_PROVIDERS,
+  oauthSignIn,
+  openPasswordReset,
+  sendPasswordReset,
+  setNewPassword,
+  type OAuthProvider,
+} from "../lib/supabase";
 import { walletSignIn } from "../lib/wallet";
 import { Icon } from "./Icon";
 
@@ -89,7 +100,14 @@ export function EmailForm({ mode, next }: { mode: "sign-in" | "sign-up"; next: s
         <input type="email" name="email" autoComplete="email" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
       <label className="field">
-        <span className="mono-label">Password</span>
+        <span className="field-label">
+          <span className="mono-label">Password</span>
+          {!signUp && (
+            <Link to="/forgot" className="field-link">
+              Forgot password?
+            </Link>
+          )}
+        </span>
         <input
           type="password"
           name="password"
@@ -229,6 +247,139 @@ export function WalletOption({ next }: { next: string }) {
         </p>
       )}
     </>
+  );
+}
+
+/** Asks Supabase to email a reset link. */
+export function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError("Enter a valid email address.");
+    setBusy(true);
+    try {
+      await sendPasswordReset(email.trim());
+      setSentTo(email.trim());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send the reset link.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthPage>
+      <AuthCard title="Reset your password" description="We'll email you a link to choose a new one.">
+        {sentTo ? (
+          <p role="status" className="form-notice">
+            If <strong>{sentTo}</strong> has an account, a reset link is on its way. Open it in this browser.
+          </p>
+        ) : (
+          <form className="auth-form" onSubmit={(e) => void submit(e)} noValidate>
+            <label className="field">
+              <span className="mono-label">Email</span>
+              <input type="email" name="email" autoComplete="email" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} />
+            </label>
+            {error && (
+              <p role="alert" className="form-error">
+                {error}
+              </p>
+            )}
+            <button type="submit" className="btn btn-solid btn-block" disabled={busy}>
+              {busy ? "Sending…" : "Send reset link"}
+              {!busy && <Icon name="arrow" />}
+            </button>
+          </form>
+        )}
+      </AuthCard>
+      <AuthSwitch prompt="Remembered it?" to="/login" label="Back to sign in" />
+    </AuthPage>
+  );
+}
+
+/** Where the reset email lands: choose a new password, then straight into the dashboard. */
+export function ResetPasswordPage() {
+  const [state, setState] = useState<"opening" | "ready" | "failed">("opening");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // The link's code works once; StrictMode runs effects twice in development.
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    openPasswordReset()
+      .then(() => setState("ready"))
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "That reset link didn't work.");
+        setState("failed");
+      });
+  }, []);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (password.length < MIN_PASSWORD_LENGTH) return setError(`Use at least ${MIN_PASSWORD_LENGTH} characters for the password.`);
+    setBusy(true);
+    try {
+      await setNewPassword(password);
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not set the new password.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthPage>
+      <AuthCard
+        title={state === "failed" ? "Reset link didn't work" : "Choose a new password"}
+        description={state === "opening" ? "Checking your link…" : state === "failed" ? "Nothing was changed." : "You'll be signed in right after."}
+      >
+        {state === "failed" && (
+          <>
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+            <Link to="/forgot" className="btn btn-solid btn-block">
+              Get a new link
+            </Link>
+          </>
+        )}
+        {state === "ready" && (
+          <form className="auth-form" onSubmit={(e) => void submit(e)} noValidate>
+            <label className="field">
+              <span className="mono-label">New password</span>
+              <input
+                type="password"
+                name="password"
+                autoComplete="new-password"
+                autoFocus
+                minLength={MIN_PASSWORD_LENGTH}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <span className="field-hint">At least {MIN_PASSWORD_LENGTH} characters.</span>
+            </label>
+            {error && (
+              <p role="alert" className="form-error">
+                {error}
+              </p>
+            )}
+            <button type="submit" className="btn btn-solid btn-block" disabled={busy}>
+              {busy ? "Saving…" : "Save and sign in"}
+              {!busy && <Icon name="arrow" />}
+            </button>
+          </form>
+        )}
+      </AuthCard>
+    </AuthPage>
   );
 }
 

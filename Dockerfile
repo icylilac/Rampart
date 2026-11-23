@@ -5,7 +5,8 @@ WORKDIR /app
 # Prisma's query engine needs OpenSSL to detect the right binary at generate time.
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 # pnpm, at the version package.json's packageManager names.
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+# CI=true: pnpm never stops to ask (there is no terminal in a build).
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 CI=true
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/sdk/package.json packages/sdk/package.json
@@ -13,7 +14,7 @@ COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
-RUN pnpm run build && pnpm prune --prod --ignore-scripts
+RUN pnpm run build && pnpm prune --prod
 
 FROM node:22-bookworm-slim
 WORKDIR /app

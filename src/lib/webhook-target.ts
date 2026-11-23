@@ -1,5 +1,8 @@
+import type { LookupAddress } from "node:dns";
 import { lookup } from "node:dns/promises";
-import { BlockList, isIP } from "node:net";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
+import { BlockList, isIP, type LookupFunction } from "node:net";
 
 /**
  * Where a project's webhooks may go. A webhook URL is chosen by whoever signs
@@ -26,6 +29,8 @@ for (const [net, prefix] of [
 }
 for (const [net, prefix] of [
   ["::", 128], // unspecified
+  ["::", 96], // IPv4-compatible (deprecated): ::a.b.c.d
+  ["::ffff:0:0:0", 96], // IPv4-translated (SIIT)
   ["::1", 128], // loopback
   ["64:ff9b::", 96], // NAT64: can map to any IPv4 address
   ["fc00::", 7], // unique local
@@ -90,7 +95,7 @@ export const resolveHost: ResolveHost = async (hostname) => (await lookup(hostna
  * every address its hostname resolves to must be public, so a DNS name can't
  * point the worker at an internal service. Throws with the reason if not.
  */
-export async function assertDeliverable(value: string, allowLocal: boolean, resolve: ResolveHost = resolveHost): Promise<void> {
+export async function assertDeliverable(value: string, allowLocal: boolean, resolve: ResolveHost = resolveHost): Promise<string[]> {
   const problem = webhookUrlProblem(value, allowLocal);
   if (problem) throw new Error(`Webhook URL refused: ${problem}`);
   const host = new URL(value).hostname.replace(/^\[|\]$/g, "");
@@ -100,4 +105,45 @@ export async function assertDeliverable(value: string, allowLocal: boolean, reso
     if (isPublicAddress(ip) || (allowLocal && isLoopback(ip))) continue;
     throw new Error(`Webhook URL refused: ${host} resolves to ${ip}, which is not a public address.`);
   }
+  return addresses;
+}
+
+/**
+ * POSTs to a webhook URL, connecting only to an address assertDeliverable
+ * already checked. A plain fetch would look the hostname up again, and a DNS
+ * name with a zero TTL could answer with an internal address the second time
+ * (DNS rebinding). TLS still verifies the certificate against the hostname.
+ * Never follows redirects.
+ */
+export function postPinned(
+  value: string,
+  address: string,
+  init: { headers: Record<string, string>; body: string; timeoutMs: number },
+): Promise<{ status: number; ok: boolean }> {
+  const url = new URL(value);
+  const family = isIP(address) === 6 ? 6 : 4;
+  const pinned: LookupFunction = (_host, options, cb) => {
+    if (options.all) cb(null, [{ address, family }] as LookupAddress[]);
+    else cb(null, address, family);
+  };
+  const send = url.protocol === "https:" ? httpsRequest : httpRequest;
+  return new Promise((resolve, reject) => {
+    const req = send(
+      url,
+      {
+        method: "POST",
+        headers: { ...init.headers, "Content-Length": Buffer.byteLength(init.body).toString() },
+        lookup: pinned,
+        timeout: init.timeoutMs,
+      },
+      (res) => {
+        res.resume(); // the body isn't needed
+        const status = res.statusCode ?? 0;
+        resolve({ status, ok: status >= 200 && status < 300 });
+      },
+    );
+    req.on("timeout", () => req.destroy(new Error(`Timed out after ${init.timeoutMs} ms`)));
+    req.on("error", reject);
+    req.end(init.body);
+  });
 }

@@ -1,5 +1,7 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
-import { assertDeliverable, isPublicAddress, webhookUrlProblem } from "../src/lib/webhook-target";
+import { assertDeliverable, isPublicAddress, postPinned, webhookUrlProblem } from "../src/lib/webhook-target";
 
 describe("webhook targets", () => {
   it("tells public addresses from private, loopback and link-local ones", () => {
@@ -7,6 +9,8 @@ describe("webhook targets", () => {
     for (const ip of [
       "10.0.0.5",
       "127.0.0.1",
+      "::a00:5", // IPv4-compatible ::10.0.0.5
+      "::ffff:0:a00:5", // IPv4-translated 10.0.0.5
       "169.254.169.254",
       "172.16.3.4",
       "192.168.1.1",
@@ -45,13 +49,35 @@ describe("webhook targets", () => {
   });
 
   it("refuses a hostname that resolves to an internal address", async () => {
-    await expect(assertDeliverable("https://hooks.example/", false, async () => ["203.0.113.7"])).resolves.toBeUndefined();
+    await expect(assertDeliverable("https://hooks.example/", false, async () => ["203.0.113.7"])).resolves.toEqual(["203.0.113.7"]);
     await expect(assertDeliverable("https://internal.example/", false, async () => ["169.254.169.254"])).rejects.toThrow(/not a public address/);
     // One bad address among several is enough to refuse.
     await expect(assertDeliverable("https://mixed.example/", false, async () => ["203.0.113.7", "10.0.0.5"])).rejects.toThrow(/10\.0\.0\.5/);
     await expect(assertDeliverable("https://empty.example/", false, async () => [])).rejects.toThrow(/does not resolve/);
     // Development may use localhost, but still not the private network.
-    await expect(assertDeliverable("http://localhost:3000/", true, async () => ["127.0.0.1"])).resolves.toBeUndefined();
+    await expect(assertDeliverable("http://localhost:3000/", true, async () => ["127.0.0.1"])).resolves.toEqual(["127.0.0.1"]);
     await expect(assertDeliverable("https://lan.example/", true, async () => ["192.168.1.10"])).rejects.toThrow();
+  });
+
+  it("connects to the checked address, not a fresh DNS answer", async () => {
+    let got: { host?: string; body: string } | null = null;
+    const server = createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        got = { host: req.headers.host, body };
+        res.writeHead(204).end();
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const { port } = server.address() as AddressInfo;
+    try {
+      // "rebind.invalid" can't resolve, so this only works if the pinned address is used.
+      const res = await postPinned(`http://rebind.invalid:${port}/hooks`, "127.0.0.1", { headers: { "Content-Type": "application/json" }, body: '{"a":1}', timeoutMs: 5000 });
+      expect(res).toEqual({ status: 204, ok: true });
+      expect(got).toEqual({ host: `rebind.invalid:${port}`, body: '{"a":1}' });
+    } finally {
+      server.close();
+    }
   });
 });

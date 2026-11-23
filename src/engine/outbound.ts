@@ -3,7 +3,7 @@ import type { RampSession } from "@prisma/client";
 import { config } from "../config";
 import { decrypt, hmacHex } from "../lib/crypto";
 import { db } from "../lib/db";
-import { assertDeliverable, resolveHost, type ResolveHost } from "../lib/webhook-target";
+import { assertDeliverable, postPinned, resolveHost, type ResolveHost } from "../lib/webhook-target";
 import type { FetchLike } from "../stellar/horizon";
 import { serializeSession } from "./serialize";
 
@@ -37,11 +37,13 @@ export async function enqueueSessionEvent(session: RampSession): Promise<void> {
  * Sends due deliveries. Each one is claimed with a conditional update on its
  * attempt count, so several workers can run without sending an event twice.
  * The URL is checked right before sending (see src/lib/webhook-target.ts),
- * and redirects aren't followed, so it can't lead to an internal address.
+ * the connection goes to the address that was checked, and redirects aren't
+ * followed, so it can't lead to an internal address. Tests pass `fetchImpl`
+ * to stand in for the network.
  */
 export async function deliverDue(
   limit = 25,
-  fetchImpl: FetchLike = fetch,
+  fetchImpl?: FetchLike,
   now = new Date(),
   resolve: ResolveHost = resolveHost,
 ): Promise<number> {
@@ -73,19 +75,16 @@ export async function deliverDue(
     let statusCode: number | null = null;
     let error: string | null = null;
     try {
-      await assertDeliverable(d.project.webhookUrl, allowLocal, resolve);
-      const res = await fetchImpl(d.project.webhookUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "Rampart-Webhooks/1",
-          "Rampart-Signature": signPayload(decrypt(d.project.webhookSecretEnc), body),
-          "Rampart-Event-Id": (d.payload as { id?: string }).id ?? d.id,
-        },
-        body,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-        redirect: "manual",
-      });
+      const [address] = await assertDeliverable(d.project.webhookUrl, allowLocal, resolve);
+      const headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Rampart-Webhooks/1",
+        "Rampart-Signature": signPayload(decrypt(d.project.webhookSecretEnc), body),
+        "Rampart-Event-Id": (d.payload as { id?: string }).id ?? d.id,
+      };
+      const res = fetchImpl
+        ? await fetchImpl(d.project.webhookUrl, { method: "POST", headers, body, signal: AbortSignal.timeout(TIMEOUT_MS), redirect: "manual" })
+        : await postPinned(d.project.webhookUrl, address!, { headers, body, timeoutMs: TIMEOUT_MS });
       statusCode = res.status;
       if (res.status >= 300 && res.status < 400) error = `HTTP ${res.status}: redirects are not followed`;
       else if (!res.ok) error = `HTTP ${res.status}`;

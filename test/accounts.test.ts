@@ -146,6 +146,34 @@ describe("dashboard API", () => {
     expect((await app.inject({ url: "/v1/sessions", headers: bearer(added.json().secret) })).statusCode).toBe(200);
   });
 
+  it("lists a project's ramps per mode, newest first, only to its owner", async () => {
+    const owner = await signUp();
+    const stranger = await signUp();
+    const created = await app.inject({ method: "POST", url: "/v1/dashboard/projects", headers: bearer(owner.token), payload: { name: "Ramps" } });
+    const { project, secrets } = created.json();
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/v1/sessions",
+        headers: bearer(secrets.test_key),
+        payload: { direction: "ON", wallet_address: Keypair.random().publicKey(), fiat_currency: "USD", fiat_amount: 10 + i, skip_preflight: true },
+      });
+      expect(res.statusCode).toBe(201);
+      ids.push(res.json().id);
+    }
+    const url = `/v1/dashboard/projects/${project.id}/sessions`;
+    const page = await app.inject({ url: `${url}?limit=2`, headers: bearer(owner.token) });
+    expect(page.statusCode).toBe(200);
+    expect(page.json().data.map((s: { id: string }) => s.id)).toEqual([ids[2], ids[1]]);
+    expect(page.json().has_more).toBe(true);
+    expect(page.json().data[0]).not.toHaveProperty("client_secret");
+    const rest = await app.inject({ url: `${url}?limit=2&starting_after=${ids[1]}`, headers: bearer(owner.token) });
+    expect(rest.json()).toMatchObject({ data: [{ id: ids[0] }], has_more: false });
+    expect((await app.inject({ url: `${url}?mode=live`, headers: bearer(owner.token) })).json().data).toEqual([]);
+    expect((await app.inject({ url, headers: bearer(stranger.token) })).statusCode).toBe(404);
+  });
+
   it("needs a signed-in user, not an API key, for the dashboard", async () => {
     expect((await app.inject({ url: "/v1/dashboard/projects" })).statusCode).toBe(401);
     expect((await app.inject({ url: "/v1/dashboard/projects", headers: bearer("rk_test_" + "a".repeat(24)) })).statusCode).toBe(401);

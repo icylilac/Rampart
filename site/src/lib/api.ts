@@ -60,4 +60,22 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
 export type User = { id: string; email: string | null; wallet_address: string | null; supabase_user_id: string | null; created_at: string };
 export type SignedIn = { token: string; expires_at: string; user: User };
 export type ApiKey = { id: string; mode: "live" | "test"; prefix: string; created_at: string; revoked_at: string | null };
+export type RampStatus = "CREATED" | "AWAITING_USER" | "AWAITING_PAYMENT" | "PROCESSING" | "COMPLETED" | "FAILED" | "EXPIRED" | "REFUNDED";
+export type RampSession = {
+  id: string;
+  livemode: boolean;
+  direction: "ON" | "OFF";
+  provider: string;
+  status: RampStatus;
+  wallet_address: string;
+  asset: { code: string };
+  fiat_currency: string | null;
+  fiat_amount: string | null;
+  crypto_amount: string | null;
+  external_reference: string | null;
+  onchain_verified: boolean;
+  failure_reason: string | null;
+  sandbox?: { scenario: string };
+  created_at: string;
+};
 export type Project = { id: string; name: string; webhook_url: string | null; created_at: string; api_keys: ApiKey[] };

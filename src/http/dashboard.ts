@@ -1,10 +1,11 @@
-import type { ApiKey, Project, User } from "@prisma/client";
+import type { ApiKey, Prisma, Project, User } from "@prisma/client";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { config } from "../config";
 import { signOut, supabaseSignIn, walletChallenge, walletSignIn, type SignedIn } from "../engine/accounts";
 import { supabaseUser } from "../lib/supabase-auth";
 import { addApiKey, createProject } from "../engine/projects";
+import { serializeSession } from "../engine/serialize";
 import { db } from "../lib/db";
 import { ApiError, notFound } from "../lib/errors";
 import { isStellarAddress } from "../lib/wallet-challenge";
@@ -29,6 +30,11 @@ const supabaseBody = z.object({ access_token: z.string().min(1).max(4000) }).str
 const keyBody = z.object({ mode: z.enum(["live", "test"]) }).strict();
 const projectParams = z.object({ id: z.string().uuid() });
 const keyParams = z.object({ id: z.string().uuid(), keyId: z.string().uuid() });
+const sessionsQuery = z.object({
+  mode: z.enum(["live", "test"]).default("test"),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  starting_after: z.string().uuid().optional(),
+});
 
 const serializeUser = (u: User) => ({
   object: "user",
@@ -143,6 +149,22 @@ export function dashboardRoutes(app: FastifyInstance) {
     }
     const { apiKey, key } = await addApiKey(id, mode === "live" ? "LIVE" : "TEST");
     return reply.status(201).send({ api_key: serializeKey(apiKey), secret: key });
+  });
+
+  // The project's ramps, newest first, one mode at a time (the dashboard's two tabs).
+  app.get("/v1/dashboard/projects/:id/sessions", async (request) => {
+    const { user } = await requireUser(request);
+    const { id } = projectParams.parse(request.params);
+    const q = sessionsQuery.parse(request.query);
+    await ownedProject(user.id, id);
+    const where: Prisma.RampSessionWhereInput = { projectId: id, livemode: q.mode === "live" };
+    if (q.starting_after) {
+      const cursor = await db().rampSession.findFirst({ where: { id: q.starting_after, projectId: id } });
+      if (!cursor) throw new ApiError(400, "invalid_cursor", "starting_after does not match a session.");
+      where.OR = [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }];
+    }
+    const rows = await db().rampSession.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: q.limit + 1 });
+    return { object: "list", data: rows.slice(0, q.limit).map((s) => serializeSession(s)), has_more: rows.length > q.limit };
   });
 
   app.delete("/v1/dashboard/projects/:id/keys/:keyId", async (request) => {

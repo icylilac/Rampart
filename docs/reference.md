@@ -285,6 +285,7 @@ stored, and signing out revokes it.
 | `POST` | `/v1/dashboard/projects` | New project (`name`, optional `webhook_url`); returns the live key, test key and webhook secret once |
 | `POST` | `/v1/dashboard/projects/:id/keys` | New `live` or `test` key, returned once |
 | `DELETE` | `/v1/dashboard/projects/:id/keys/:keyId` | Revoke a key; it stops working immediately |
+| `GET` | `/v1/dashboard/projects/:id/sessions` | The project's ramps, newest first (`mode` `test` or `live`, `limit`, cursor `starting_after`) |
 
 Projects made with `npm run project:create` have no owner and don't appear in
 anyone's dashboard. The site calls the API set in `VITE_RAMPART_API_URL` at

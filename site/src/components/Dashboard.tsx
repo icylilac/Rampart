@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { GITHUB } from "../content";
-import { api, ApiError, setToken, type ApiKey, type Project, type User } from "../lib/api";
+import { api, ApiError, setToken, type ApiKey, type Project, type RampSession, type User } from "../lib/api";
 import { Link, navigate } from "../lib/router";
 import { shortAddress } from "../lib/wallet";
 import { Icon } from "./Icon";
@@ -259,7 +259,115 @@ function ProjectCard({ project, onChange, onSecret }: { project: Project; onChan
           {error}
         </p>
       )}
+      <Ramps project={project} />
     </article>
+  );
+}
+
+const when = (iso: string) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+function amount(s: RampSession) {
+  const fiat = s.fiat_amount ? `${Number(s.fiat_amount)} ${s.fiat_currency ?? ""}`.trim() : null;
+  const crypto = s.crypto_amount ? `${Number(s.crypto_amount)} ${s.asset.code}` : s.asset.code;
+  return s.direction === "ON" ? `${fiat ?? "?"} → ${crypto}` : `${crypto} → ${fiat ?? s.fiat_currency ?? "fiat"}`;
+}
+
+/** The project's ramps, test or live, newest first. Loaded when opened. */
+function Ramps({ project }: { project: Project }) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"test" | "live">("test");
+  const [rows, setRows] = useState<RampSession[] | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPage = useCallback(
+    async (after?: string) => {
+      setBusy(true);
+      setError(null);
+      try {
+        const qs = new URLSearchParams({ mode, limit: "20", ...(after ? { starting_after: after } : {}) });
+        const res = await api<{ data: RampSession[]; has_more: boolean }>(`/v1/dashboard/projects/${project.id}/sessions?${qs}`);
+        setRows((prev) => (after ? [...(prev ?? []), ...res.data] : res.data));
+        setHasMore(res.has_more);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not load the ramps.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [mode, project.id],
+  );
+
+  useEffect(() => {
+    if (open) void fetchPage();
+  }, [open, fetchPage]);
+
+  return (
+    <section className="ramps" aria-label={`Ramps for ${project.name}`}>
+      <div className="ramps-head">
+        <button className="ramps-toggle mono-label" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          <span className={`chevron${open ? " open" : ""}`} aria-hidden>
+            ›
+          </span>
+          Ramps
+        </button>
+        {open && (
+          <div className="ramps-tabs" role="tablist">
+            {(["test", "live"] as const).map((m) => (
+              <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? "on" : ""} onClick={() => setMode(m)}>
+                {m}
+              </button>
+            ))}
+            <button className="ramps-refresh" onClick={() => void fetchPage()} disabled={busy} aria-label="Refresh ramps">
+              ↻
+            </button>
+          </div>
+        )}
+      </div>
+      {open && (
+        <>
+          {rows === null && busy && <p className="muted ramps-note">Loading…</p>}
+          {rows?.length === 0 && (
+            <p className="muted ramps-note">
+              No {mode} ramps yet. They appear here when your backend calls <code>POST /v1/sessions</code> with a {mode} key.
+            </p>
+          )}
+          {rows && rows.length > 0 && (
+            <ul className="ramp-list">
+              {rows.map((s) => (
+                <li key={s.id} className="ramp-row">
+                  <span className={`ramp-status ${s.status.toLowerCase()}`}>{s.status.replace(/_/g, " ")}</span>
+                  <span className="ramp-what">
+                    <strong>{s.direction === "ON" ? "On-ramp" : "Off-ramp"}</strong> {amount(s)}
+                    <span className="mono-label">
+                      {s.provider.toLowerCase()}
+                      {s.sandbox ? ` · ${s.sandbox.scenario.replace(/_/g, " ")}` : ""}
+                      {s.onchain_verified ? " · verified on Stellar" : ""}
+                    </span>
+                    {s.failure_reason && <span className="ramp-fail">{s.failure_reason}</span>}
+                  </span>
+                  <code className="ramp-wallet" title={s.wallet_address}>
+                    {shortAddress(s.wallet_address)}
+                  </code>
+                  <span className="muted ramp-when">{when(s.created_at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {hasMore && (
+            <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => rows && void fetchPage(rows[rows.length - 1]!.id)}>
+              {busy ? "Loading…" : "Load more"}
+            </button>
+          )}
+          {error && (
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 

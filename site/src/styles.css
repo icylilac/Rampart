@@ -267,6 +267,32 @@ main > .box + .box { border-top: 0; }
 .key-mode.live { background: var(--ink); color: #fff; border-color: var(--ink); }
 .key-mode.test { color: var(--teal-deep); border-color: var(--teal); }
 .keys-revoked { margin: -8px 0 0; }
+
+/* Ramps */
+.ramps { display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 18px; }
+.ramps-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ramps-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 6px 0; color: var(--ink); }
+.chevron { display: inline-block; font-size: 16px; line-height: 1; transition: transform .15s; }
+.chevron.open { transform: rotate(90deg); }
+.ramps-tabs { display: flex; border: 1px solid var(--line); }
+.ramps-tabs button { padding: 6px 14px; font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ramps-tabs button + button { border-left: 1px solid var(--line); }
+.ramps-tabs button.on { background: var(--ink); color: #fff; }
+.ramps-tabs .ramps-refresh { font-size: 14px; letter-spacing: 0; }
+.ramps-note { margin: 0; font-size: 14px; }
+.ramp-list { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); }
+.ramp-row { display: grid; grid-template-columns: 150px 1fr auto auto; gap: 16px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 14px; }
+.ramp-row:first-child { border-top: 0; }
+.ramp-what { display: grid; gap: 2px; min-width: 0; }
+.ramp-what .mono-label { text-transform: none; }
+.ramp-fail { color: #B42318; font-size: 13px; }
+.ramp-wallet { font-size: 12px; color: var(--muted); }
+.ramp-when { font-size: 13px; white-space: nowrap; }
+.ramp-status { justify-self: start; padding: 4px 8px; font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.ramp-status.completed { color: var(--teal-deep); border-color: var(--teal); }
+.ramp-status.processing, .ramp-status.awaiting_payment { color: var(--ink); border-color: var(--ink); }
+.ramp-status.failed { color: #B42318; border-color: #F4B4AE; }
+.ramp-status.refunded { color: #9A6700; border-color: #E8C77A; }
 .secrets { display: grid; gap: 20px; padding: 32px 56px; background: #F0FDFA; border-color: var(--teal) !important; border-top: 1px solid var(--teal) !important; }
 .secrets-head { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
 .secrets-head h2 { font-size: 24px; margin-bottom: 4px; }
@@ -330,6 +356,9 @@ main > .box + .box { border-top: 0; }
   .project-meta { grid-template-columns: 1fr; gap: 4px; }
   .key-row { grid-template-columns: auto 1fr auto; }
   .key-row > :nth-child(3) { display: none; }
+  .ramp-row { grid-template-columns: 1fr auto; gap: 6px 12px; }
+  .ramp-what { grid-column: 1 / -1; grid-row: 2; }
+  .ramp-wallet { display: none; }
   .secret dd { flex-wrap: wrap; }
   .secret dd .btn { flex: 1 1 100%; }
 }

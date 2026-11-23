@@ -385,7 +385,8 @@ a.dash-who:hover { color: var(--ink); text-decoration: underline; text-underline
   .dash-who { max-width: 34vw; font-size: 11px; }
   .dash-head, .new-project, .dash-empty, .project, .secrets { padding-left: 20px; padding-right: 20px; }
   .new-project { grid-template-columns: 1fr; }
-  .project-head .actions .btn { flex: 1 1 100%; }
+  .project-head .actions { width: 100%; }
+  .project-head .actions .btn { flex: 1 1 0; padding: 0 10px; }
   .project-meta { grid-template-columns: 1fr; gap: 4px; }
   .key-row { grid-template-columns: auto 1fr auto; }
   .key-row > :nth-child(3) { display: none; }

@@ -231,6 +231,7 @@ main > .box + .box { border-top: 0; }
 .auth-head p { margin: 0; font-size: 15px; }
 .auth-form { display: grid; gap: 16px; }
 .auth-form .btn { margin-top: 4px; }
+.oauth-buttons { display: grid; gap: 10px; }
 .divider { display: flex; align-items: center; gap: 12px; font-size: 11px; }
 .divider span { flex: 1; height: 1px; background: var(--line); }
 .auth-switch { margin: 0; font-size: 14px; padding: 10px 16px; background: #fff; border: 1px solid var(--line); }

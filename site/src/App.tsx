@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LoginPage, SignupPage } from "./components/Auth";
+import { LoginPage, OAuthCallbackPage, SignupPage } from "./components/Auth";
 import { CodeTabs } from "./components/CodeTabs";
 import { DashboardPage } from "./components/Dashboard";
 import { Icon } from "./components/Icon";
@@ -31,6 +31,7 @@ const TITLES: Record<string, string> = {
   "/login": "Sign in · Rampart",
   "/signup": "Create account · Rampart",
   "/dashboard": "Dashboard · Rampart",
+  "/auth/callback": "Signing in · Rampart",
 };
 
 /** Routes: the landing page, sign-in, sign-up and the dashboard. */
@@ -52,6 +53,7 @@ export function App() {
   if (redirect) return null;
   if (path === "/login") return <LoginPage next={next} notice={search.has("expired") ? "Your session ended. Sign in again." : undefined} />;
   if (path === "/signup") return <SignupPage next={next} />;
+  if (path === "/auth/callback") return <OAuthCallbackPage />;
   if (path === "/dashboard") return <DashboardPage />;
   return <Home signedIn={signedIn} />;
 }

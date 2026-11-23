@@ -1,5 +1,6 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { api, setToken, type SignedIn } from "../lib/api";
+import { finishOAuth, OAUTH_PROVIDERS, startOAuth, type OAuthProvider } from "../lib/oauth";
 import { Link, navigate, withNext } from "../lib/router";
 import { walletSignIn } from "../lib/wallet";
 import { Icon } from "./Icon";
@@ -98,6 +99,78 @@ export function EmailForm({ mode, next }: { mode: "sign-in" | "sign-up"; next: s
   );
 }
 
+/** Google, GitHub, ...: above email, since it's the fastest way in. Hidden when the site isn't set up for it. */
+export function OAuthButtons({ next }: { next: string }) {
+  const [busy, setBusy] = useState<OAuthProvider | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (OAUTH_PROVIDERS.length === 0) return null;
+
+  async function go(provider: OAuthProvider) {
+    setBusy(provider);
+    setError(null);
+    try {
+      await startOAuth(provider, next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start the sign-in.");
+      setBusy(null);
+    }
+  }
+
+  return (
+    <>
+      <div className="oauth-buttons">
+        {OAUTH_PROVIDERS.map((p) => (
+          <button key={p.id} type="button" className="btn btn-outline btn-block" disabled={busy !== null} onClick={() => void go(p.id)}>
+            <Icon name={p.id} />
+            {busy === p.id ? "Redirecting…" : p.label}
+          </button>
+        ))}
+      </div>
+      {error && (
+        <p role="alert" className="form-error">
+          {error}
+        </p>
+      )}
+      <div className="divider mono-label">
+        <span />
+        or
+        <span />
+      </div>
+    </>
+  );
+}
+
+/** Where Supabase Auth sends people back to: trade the code, then go on. */
+export function OAuthCallbackPage() {
+  const [error, setError] = useState<string | null>(null);
+  // The code works once; StrictMode runs effects twice in development.
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    finishOAuth()
+      .then((next) => navigate(next, { replace: true }))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "That sign-in didn't go through."));
+  }, []);
+
+  return (
+    <AuthPage>
+      <AuthCard title={error ? "Sign-in didn't finish" : "Signing you in…"} description={error ? "Nothing was changed. You can try again." : "One moment."}>
+        {error && (
+          <>
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+            <Link to="/login" className="btn btn-solid btn-block">
+              Back to sign in
+            </Link>
+          </>
+        )}
+      </AuthCard>
+    </AuthPage>
+  );
+}
+
 /** The wallet path: below email, and deliberately quieter. */
 export function WalletOption({ next }: { next: string }) {
   const [busy, setBusy] = useState(false);
@@ -144,6 +217,7 @@ export function LoginPage({ next, notice }: { next: string; notice?: string }) {
             {notice}
           </p>
         )}
+        <OAuthButtons next={next} />
         <EmailForm mode="sign-in" next={next} />
         <WalletOption next={next} />
       </AuthCard>
@@ -155,7 +229,8 @@ export function LoginPage({ next, notice }: { next: string; notice?: string }) {
 export function SignupPage({ next }: { next: string }) {
   return (
     <AuthPage>
-      <AuthCard title="Create your account" description="Sign up with email. No wallet needed to get test keys.">
+      <AuthCard title="Create your account" description="Sign up with Google, GitHub or email. No wallet needed to get test keys.">
+        <OAuthButtons next={next} />
         <EmailForm mode="sign-up" next={next} />
         <WalletOption next={next} />
       </AuthCard>

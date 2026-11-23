@@ -271,6 +271,7 @@ stored, and signing out revokes it.
 | `POST` | `/v1/auth/login` | Sign in with email and password |
 | `POST` | `/v1/auth/wallet/challenge` | Message for the wallet to sign (`address`) |
 | `POST` | `/v1/auth/wallet` | Sign in with the signed challenge (`address`, `token`, `signature`) |
+| `POST` | `/v1/auth/oauth` | Sign in with Google, GitHub, ... through Supabase Auth (`code`, `code_verifier`) |
 | `GET` | `/v1/auth/me` | The signed-in user |
 | `POST` | `/v1/auth/logout` | End the session |
 | `GET` | `/v1/dashboard/projects` | The user's projects and their keys (prefixes only) |
@@ -281,6 +282,22 @@ stored, and signing out revokes it.
 Projects made with `npm run project:create` have no owner and don't appear in
 anyone's dashboard. The site calls the API set in `VITE_RAMPART_API_URL` at
 build time (default `http://localhost:8080`).
+
+**Google, GitHub and other providers** go through Supabase Auth with PKCE. The
+site sends the person to Supabase, which sends them back to `/auth/callback`
+with a one-time code; the API trades the code and verifier with Supabase for
+the provider-confirmed email, then signs in that email's account (creating it,
+or joining an email + password account with the same address). To turn it on:
+
+1. In Supabase, under **Authentication → Sign In / Providers**, enable each
+   provider with its OAuth client ID and secret. The provider's callback URL is
+   `https://<ref>.supabase.co/auth/v1/callback`.
+2. Under **Authentication → URL Configuration**, add the site's
+   `https://<site>/auth/callback` to the redirect URLs.
+3. Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` on the API, and
+   `VITE_SUPABASE_URL` on the site. Without it the buttons don't show.
+
+Accounts live in Rampart's own `users` table, not in Supabase Auth's user list.
 
 ## Test mode and the sandbox
 

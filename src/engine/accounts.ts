@@ -7,12 +7,13 @@ import { decoyHash, hashPassword, verifyPassword } from "../lib/password";
 import { createWalletChallenge, verifyWalletChallenge, type WalletChallenge } from "../lib/wallet-challenge";
 
 /**
- * Dashboard accounts, signed in the same two ways as Doqtri: email + password,
- * or a Stellar wallet that signs a one-time SEP-53 challenge. Either way the
- * result is an opaque bearer token (rds_...) whose hash is stored.
+ * Dashboard accounts, signed in three ways: email + password, a Stellar wallet
+ * that signs a one-time SEP-53 challenge, or a Google/GitHub/... account
+ * through Supabase Auth. Every way ends in an opaque bearer token (rds_...)
+ * whose hash is stored.
  */
 
-export type SignInMethod = "password" | "wallet";
+export type SignInMethod = "password" | "wallet" | "oauth";
 export type SignedIn = { user: User; token: string; expiresAt: Date };
 
 const SESSION_PREFIX = "rds_";
@@ -66,6 +67,23 @@ export async function walletSignIn(address: string, token: string, signature: st
     // Two tabs signing in with the same new wallet: the other one created it.
     if (!isUniqueViolation(e)) throw e;
     return startSession(await db().user.findUniqueOrThrow({ where: { walletAddress: address } }), "wallet");
+  }
+}
+
+/**
+ * Signs in the account for a provider-verified email, creating it on first
+ * use. An existing email + password account with the same address is the same
+ * person (the provider confirmed they own it), so they share one account.
+ */
+export async function oauthSignIn(email: string): Promise<SignedIn> {
+  const address = email.toLowerCase();
+  const existing = await db().user.findUnique({ where: { email: address } });
+  if (existing) return startSession(existing, "oauth");
+  try {
+    return startSession(await db().user.create({ data: { email: address } }), "oauth");
+  } catch (e) {
+    if (!isUniqueViolation(e)) throw e;
+    return startSession(await db().user.findUniqueOrThrow({ where: { email: address } }), "oauth");
   }
 }
 

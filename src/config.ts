@@ -45,6 +45,12 @@ const baseSchema = z.object({
   AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(0).default(10),
   /** How long a dashboard sign-in lasts. */
   USER_SESSION_DAYS: z.coerce.number().int().positive().default(30),
+  /**
+   * Supabase Auth, for dashboard sign-in with Google, GitHub and other
+   * providers (POST /v1/auth/oauth). Set both, or neither to turn it off.
+   */
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_ANON_KEY: optional,
   /** Set to "true" behind a reverse proxy so client IPs come from X-Forwarded-For. */
   TRUST_PROXY: z
     .string()
@@ -91,10 +97,15 @@ const baseSchema = z.object({
     .transform((v) => v !== "false"),
 });
 
-export const configSchema = baseSchema.refine(
-  (c) => Boolean(c.RECEIPTS_CONTRACT_ID) === Boolean(c.RECEIPTS_ATTESTER_SECRET),
-  { message: "Set both RECEIPTS_CONTRACT_ID and RECEIPTS_ATTESTER_SECRET, or neither", path: ["RECEIPTS_CONTRACT_ID"] },
-);
+export const configSchema = baseSchema
+  .refine((c) => Boolean(c.RECEIPTS_CONTRACT_ID) === Boolean(c.RECEIPTS_ATTESTER_SECRET), {
+    message: "Set both RECEIPTS_CONTRACT_ID and RECEIPTS_ATTESTER_SECRET, or neither",
+    path: ["RECEIPTS_CONTRACT_ID"],
+  })
+  .refine((c) => Boolean(c.SUPABASE_URL) === Boolean(c.SUPABASE_ANON_KEY), {
+    message: "Set both SUPABASE_URL and SUPABASE_ANON_KEY, or neither",
+    path: ["SUPABASE_URL"],
+  });
 
 export type Config = z.infer<typeof configSchema>;
 

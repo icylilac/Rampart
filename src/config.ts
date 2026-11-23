@@ -58,11 +58,15 @@ const baseSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optional,
   /** Domain for the placeholder email of a wallet's Supabase user; nothing is ever sent to it. */
   WALLET_EMAIL_DOMAIN: z.string().trim().min(1).default("wallet.rampartpay.xyz"),
-  /** Set to "true" behind a reverse proxy so client IPs come from X-Forwarded-For. */
+  /**
+   * Behind a reverse proxy, where client IPs come from X-Forwarded-For: the
+   * number of proxies in front of Rampart (safest), or "true" to trust every
+   * hop, which is only safe if the proxy overwrites the header (Vercel does).
+   */
   TRUST_PROXY: z
     .string()
     .optional()
-    .transform((v) => v === "true"),
+    .transform((v): boolean | number => (v === "true" ? true : v && /^[0-9]+$/.test(v.trim()) ? Number(v) : false)),
 
   /**
    * Turns on POST /internal/reconcile (one worker pass) for a scheduler to

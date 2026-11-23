@@ -49,15 +49,16 @@ describe("hardening", () => {
     expect(other.statusCode).toBe(503);
   });
 
-  it("rate-limits per key, separately from other callers, but never health checks", async () => {
-    const other = { authorization: "Bearer rk_test_someone_else" };
+  it("rate-limits per IP, even with a new made-up key on every request, but never health checks", async () => {
+    const from = (remoteAddress: string, i: number) => app.inject({ url: "/v1/providers", remoteAddress, headers: auth(`rk_test_made_up_${i}`) });
     const codes = [];
-    for (let i = 0; i < 9; i++) codes.push((await app.inject({ url: "/v1/providers", headers: auth("rk_test_limit_a") })).statusCode);
+    for (let i = 0; i < 9; i++) codes.push((await from("203.0.113.30", i)).statusCode);
     expect(codes).toEqual([...Array(8).fill(200), 429]);
-    const limited = await app.inject({ url: "/v1/providers", headers: auth("rk_test_limit_a") });
+    const limited = await from("203.0.113.30", 99);
     expect(limited.json()).toEqual({ error: { code: "rate_limited", message: "Too many requests. Try again shortly." } });
-    expect((await app.inject({ url: "/v1/providers", headers: other })).statusCode).toBe(200);
-    for (let i = 0; i < 12; i++) expect((await app.inject({ url: "/health" })).statusCode).toBe(200);
+    // Another IP still gets its own requests.
+    expect((await from("203.0.113.31", 0)).statusCode).toBe(200);
+    for (let i = 0; i < 12; i++) expect((await app.inject({ url: "/health", remoteAddress: "203.0.113.30" })).statusCode).toBe(200);
   });
 
   it("sends security headers, and a strict CSP on the sandbox page", async () => {
@@ -78,12 +79,12 @@ describe("hardening", () => {
       redirect_url,
     });
     for (const bad of ["javascript:alert(1)", "data:text/html,hi", "http://evil.example/return", "ftp://x.example/"]) {
-      const res = await app.inject({ method: "POST", url: "/v1/sessions", headers: auth(testKey), payload: body(bad) });
+      const res = await app.inject({ method: "POST", url: "/v1/sessions", remoteAddress: "203.0.113.40", headers: auth(testKey), payload: body(bad) });
       expect(res.statusCode, bad).toBe(400);
       expect(res.json().error.code).toBe("validation_error");
     }
     for (const ok of ["https://app.example/return", "http://localhost:3000/return"]) {
-      const res = await app.inject({ method: "POST", url: "/v1/sessions", headers: auth(testKey), payload: body(ok) });
+      const res = await app.inject({ method: "POST", url: "/v1/sessions", remoteAddress: "203.0.113.40", headers: auth(testKey), payload: body(ok) });
       expect(res.statusCode, ok).toBe(201);
     }
   });
@@ -96,7 +97,7 @@ describe("hardening", () => {
     const signIn = await app.inject({ method: "POST", url: "/v1/auth/wallet", remoteAddress: "203.0.113.20", payload: { address: kp.publicKey(), token, signature } });
     const headers = auth(signIn.json().token);
     for (const webhook_url of ["https://169.254.169.254/latest/meta-data/", "https://10.0.0.5/hooks", "http://localhost:3000/hooks", "https://[::1]/"]) {
-      const res = await app.inject({ method: "POST", url: "/v1/dashboard/projects", headers, payload: { name: "SSRF", webhook_url } });
+      const res = await app.inject({ method: "POST", url: "/v1/dashboard/projects", remoteAddress: "203.0.113.20", headers, payload: { name: "SSRF", webhook_url } });
       expect(res.statusCode, webhook_url).toBe(400);
       expect(res.json().error.code).toBe("validation_error");
     }

@@ -19,7 +19,7 @@ import { requireApiKey, requireClientSecret } from "./http/auth";
 import { dashboardRoutes } from "./http/dashboard";
 import { sandboxCheckoutPage } from "./http/sandbox-page";
 import { reconcileOnce } from "./engine/reconciler";
-import { safeEqual, sha256Hex } from "./lib/crypto";
+import { safeEqual } from "./lib/crypto";
 import { ApiError, badRequest } from "./lib/errors";
 import { allProviders, provider as providerFor, sandbox } from "./providers/registry";
 import { SCENARIO_DESCRIPTIONS, SCENARIOS } from "./providers/sandbox";
@@ -97,28 +97,34 @@ const idParams = z.object({ id: z.string().uuid() });
 
 /**
  * Routes a browser calls directly: a session's client secret (/v1/client) and
- * the dashboard (/v1/auth, /v1/dashboard). They take bearer tokens, never
+ * the dashboard (/v1/auth, /v1/dashboard, /v1/account). They take bearer tokens, never
  * cookies, so any origin may call them.
  */
-const BROWSER_ROUTES = ["/v1/client/", "/v1/auth/", "/v1/dashboard/"];
+const BROWSER_ROUTES = ["/v1/client/", "/v1/auth/", "/v1/dashboard/", "/v1/account/"];
 const isBrowserRoute = (url: string) => BROWSER_ROUTES.some((p) => url.startsWith(p));
 
 function cors(reply: FastifyReply) {
   reply.header("Access-Control-Allow-Origin", "*");
   reply.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
-  reply.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  reply.header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   reply.header("Access-Control-Max-Age", "600");
 }
 
-/** Rate-limit bucket: the caller's key or client secret (hashed), else its IP. */
+/**
+ * Rate-limit bucket: the caller's IP. Not the bearer token: the limit runs
+ * before the token is checked, so keying on it would let anyone get a fresh
+ * bucket per request by sending made-up tokens.
+ */
 function rateLimitKey(request: FastifyRequest): string {
-  const m = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "");
-  return m ? `k:${sha256Hex(m[1]).slice(0, 32)}` : `ip:${request.ip}`;
+  return `ip:${request.ip}`;
 }
 
 export function buildServer(): FastifyInstance {
   const cfg = config();
-  const app = Fastify({ logger: cfg.NODE_ENV !== "test", bodyLimit: 256 * 1024, trustProxy: cfg.TRUST_PROXY });
+  const hops = cfg.TRUST_PROXY;
+  // A hop count trusts only that many proxies, nearest first.
+  const trustProxy = typeof hops === "number" ? (_address: string, hop: number) => hop < hops : hops;
+  const app = Fastify({ logger: cfg.NODE_ENV !== "test", bodyLimit: 256 * 1024, trustProxy });
 
   if (cfg.RATE_LIMIT_PER_MINUTE > 0 || cfg.AUTH_RATE_LIMIT_PER_MINUTE > 0) {
     void app.register(rateLimit, {

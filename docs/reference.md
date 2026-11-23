@@ -612,7 +612,7 @@ All settings are environment variables validated at startup ([`src/config.ts`](.
 | `RATE_LIMIT_PER_MINUTE` | | Requests per minute per API key, client secret or IP (default 300, `0` = off); health checks and provider webhooks are exempt |
 | `AUTH_RATE_LIMIT_PER_MINUTE` | | Sign-up, sign-in and wallet-challenge requests per minute per IP (default 10, `0` = off) |
 | `USER_SESSION_DAYS` | | How long a dashboard sign-in lasts (default 30) |
-| `TRUST_PROXY` | | `true` behind a reverse proxy, so client IPs come from `X-Forwarded-For` |
+| `TRUST_PROXY` | | Behind a reverse proxy, so client IPs come from `X-Forwarded-For`: the number of proxies in front (e.g. `1`), or `true` if the proxy overwrites the header, as Vercel does |
 | `SOROBAN_RPC_URL` | | Soroban RPC override; defaults to SDF's testnet RPC (or a mainnet RPC on `PUBLIC`) |
 
 ## Repository layout

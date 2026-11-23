@@ -84,6 +84,8 @@ export function dashboardRoutes(app: FastifyInstance) {
       if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
     });
   const projectBody = z.object({ name: z.string().trim().min(1).max(80), webhook_url: webhookUrl.nullish() }).strict();
+  // null removes the webhook. Deliveries already queued go to the new URL.
+  const projectPatch = z.object({ webhook_url: webhookUrl.nullable() }).strict();
   // Sign-in endpoints get their own, tighter per-IP budget.
   const authLimit =
     cfg.AUTH_RATE_LIMIT_PER_MINUTE > 0
@@ -149,6 +151,19 @@ export function dashboardRoutes(app: FastifyInstance) {
     }
     const { apiKey, key } = await addApiKey(id, mode === "live" ? "LIVE" : "TEST");
     return reply.status(201).send({ api_key: serializeKey(apiKey), secret: key });
+  });
+
+  app.patch("/v1/dashboard/projects/:id", async (request) => {
+    const { user } = await requireUser(request);
+    const { id } = projectParams.parse(request.params);
+    const b = projectPatch.parse(request.body);
+    await ownedProject(user.id, id);
+    const project = await db().project.update({
+      where: { id },
+      data: { webhookUrl: b.webhook_url },
+      include: { apiKeys: { orderBy: { createdAt: "asc" } } },
+    });
+    return serializeProject(project);
   });
 
   // The project's ramps, newest first, one mode at a time (the dashboard's two tabs).

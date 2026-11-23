@@ -174,6 +174,21 @@ describe("dashboard API", () => {
     expect((await app.inject({ url, headers: bearer(stranger.token) })).statusCode).toBe(404);
   });
 
+  it("changes and removes a project's webhook URL, refusing internal addresses and strangers", async () => {
+    const owner = await signUp();
+    const stranger = await signUp();
+    const { project } = (await app.inject({ method: "POST", url: "/v1/dashboard/projects", headers: bearer(owner.token), payload: { name: "Hooks" } })).json();
+    const patch = (token: string, webhook_url: string | null) =>
+      app.inject({ method: "PATCH", url: `/v1/dashboard/projects/${project.id}`, headers: bearer(token), payload: { webhook_url } });
+
+    const set = await patch(owner.token, "https://hooks.example.com/ramp");
+    expect(set.statusCode).toBe(200);
+    expect(set.json()).toMatchObject({ id: project.id, webhook_url: "https://hooks.example.com/ramp" });
+    expect((await patch(owner.token, "https://10.0.0.5/hook")).statusCode).toBe(400);
+    expect((await patch(stranger.token, "https://evil.example.com/")).statusCode).toBe(404);
+    expect((await patch(owner.token, null)).json().webhook_url).toBeNull();
+  });
+
   it("needs a signed-in user, not an API key, for the dashboard", async () => {
     expect((await app.inject({ url: "/v1/dashboard/projects" })).statusCode).toBe(401);
     expect((await app.inject({ url: "/v1/dashboard/projects", headers: bearer("rk_test_" + "a".repeat(24)) })).statusCode).toBe(401);

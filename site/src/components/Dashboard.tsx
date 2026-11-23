@@ -232,7 +232,9 @@ function ProjectCard({ project, onChange, onSecret }: { project: Project; onChan
 
       <dl className="project-meta">
         <dt className="mono-label">Webhook</dt>
-        <dd>{project.webhook_url ?? <span className="muted">Not set</span>}</dd>
+        <dd>
+          <WebhookField project={project} onChange={onChange} />
+        </dd>
       </dl>
 
       <ul className="keys" aria-label={`API keys for ${project.name}`}>
@@ -261,6 +263,70 @@ function ProjectCard({ project, onChange, onSecret }: { project: Project; onChan
       )}
       <Ramps project={project} />
     </article>
+  );
+}
+
+/** The webhook URL, editable in place. Empty removes it. */
+function WebhookField({ project, onChange }: { project: Project; onChange: (p: Project) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(project.webhook_url ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await api<Project>(`/v1/dashboard/projects/${project.id}`, { method: "PATCH", body: { webhook_url: value.trim() || null } });
+      onChange(updated);
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the webhook URL.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <span className="inline-field">
+        {project.webhook_url ? <span className="inline-value">{project.webhook_url}</span> : <span className="muted">Not set</span>}
+        <button
+          className="link-btn"
+          onClick={() => {
+            setValue(project.webhook_url ?? "");
+            setEditing(true);
+          }}
+        >
+          {project.webhook_url ? "Change" : "Add"}
+        </button>
+      </span>
+    );
+  }
+  return (
+    <form className="inline-edit" onSubmit={(e) => void save(e)} noValidate>
+      <input
+        type="url"
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="https://example.com/hooks/ramp"
+        aria-label={`Webhook URL for ${project.name}`}
+      />
+      <button type="submit" className="btn btn-solid btn-sm" disabled={busy}>
+        {busy ? "Saving…" : "Save"}
+      </button>
+      <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+      <span className="field-hint">Leave empty to stop sending webhooks.</span>
+      {error && (
+        <p role="alert" className="form-error">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
 

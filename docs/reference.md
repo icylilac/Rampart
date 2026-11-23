@@ -283,6 +283,7 @@ stored, and signing out revokes it.
 | `POST` | `/v1/auth/logout` | End the session |
 | `GET` | `/v1/dashboard/projects` | The user's projects and their keys (prefixes only) |
 | `POST` | `/v1/dashboard/projects` | New project (`name`, optional `webhook_url`); returns the live key, test key and webhook secret once |
+| `PATCH` | `/v1/dashboard/projects/:id` | Change the `webhook_url` (`null` removes it) |
 | `POST` | `/v1/dashboard/projects/:id/keys` | New `live` or `test` key, returned once |
 | `DELETE` | `/v1/dashboard/projects/:id/keys/:keyId` | Revoke a key; it stops working immediately |
 | `GET` | `/v1/dashboard/projects/:id/sessions` | The project's ramps, newest first (`mode` `test` or `live`, `limit`, cursor `starting_after`) |

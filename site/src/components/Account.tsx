@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, setToken, type User } from "../lib/api";
 import { Link, navigate } from "../lib/router";
 import { linkWalletToAccount } from "../lib/wallet";
-import { DashNav, signOut } from "./Dashboard";
+import { DashFooter, DashNav, signOut } from "./Dashboard";
 import { Icon } from "./Icon";
 
 const date = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
@@ -141,6 +141,7 @@ export function AccountPage() {
           </>
         )}
       </main>
+      <DashFooter />
     </div>
   );
 }

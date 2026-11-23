@@ -92,13 +92,7 @@ export function DashboardPage() {
         ))}
       </main>
 
-      <footer className="footer">
-        <span className="nav-brand small">
-          <img src="/icon.svg" alt="" />
-          Rampart
-        </span>
-        <span className="mono-label">Secrets are shown once · Keys are stored as hashes</span>
-      </footer>
+      <DashFooter />
     </div>
   );
 }
@@ -107,6 +101,24 @@ export async function signOut(everywhere = false) {
   await api(everywhere ? "/v1/auth/logout-all" : "/v1/auth/logout", { method: "POST" }).catch(() => undefined);
   setToken(null);
   navigate("/login", { replace: true });
+}
+
+/** The signed-in footer. Docs live here too, since the header has no room for them on a phone. */
+export function DashFooter() {
+  return (
+    <footer className="footer">
+      <span className="nav-brand small">
+        <img src="/icon.svg" alt="" />
+        Rampart
+      </span>
+      <span className="footer-links">
+        <a className="mono-label" href={DOCS} target="_blank" rel="noreferrer">
+          Docs
+        </a>
+        <span className="mono-label">Secrets are shown once · Keys are stored as hashes</span>
+      </span>
+    </footer>
+  );
 }
 
 /** The signed-in header: who you are (links to your account), docs, sign out. */
@@ -122,7 +134,7 @@ export function DashNav({ user }: { user: User | null }) {
         {user && (
           <Link to="/account" className="dash-who mono-label" title={`Account: ${user.email ?? user.wallet_address ?? ""}`}>
             {user.wallet_address && !user.email && <Icon name="wallet" />}
-            {who}
+            <span className="dash-who-text">{who}</span>
           </Link>
         )}
         <a className="btn btn-outline hide-sm" href={DOCS} target="_blank" rel="noreferrer">

@@ -243,7 +243,10 @@ main > .box + .box { border-top: 0; }
 /* Dashboard */
 .dash-nav { margin-bottom: 32px; }
 .dash-who { display: inline-flex; align-items: center; gap: 8px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: .02em; }
-.dash-who .icon { width: 16px; height: 16px; }
+.dash-who .icon { width: 16px; height: 16px; flex: none; }
+.dash-who-text { overflow: hidden; text-overflow: ellipsis; }
+.footer-links { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.footer-links a { text-decoration: underline; text-underline-offset: 3px; }
 .dash main > .box + .box { border-top: 0; }
 .dash-head { display: grid; gap: 12px; padding: 48px 56px; }
 .dash-head h1 { font-size: clamp(34px, 4vw, 52px); line-height: 1; letter-spacing: -.045em; }
@@ -378,7 +381,8 @@ a.dash-who:hover { color: var(--ink); text-decoration: underline; text-underline
   .code pre { font-size: 12.5px; padding: 20px 16px; }
   .auth-page { padding: 16px var(--gutter) 32px; }
   .auth-card { padding: 28px 20px; }
-  .dash-who { display: none; }
+  .dash-nav .nav-right { gap: 10px; padding-left: 12px; min-width: 0; }
+  .dash-who { max-width: 34vw; font-size: 11px; }
   .dash-head, .new-project, .dash-empty, .project, .secrets { padding-left: 20px; padding-right: 20px; }
   .new-project { grid-template-columns: 1fr; }
   .project-head .actions .btn { flex: 1 1 100%; }

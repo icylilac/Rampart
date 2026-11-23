@@ -2,18 +2,18 @@ import { Prisma, type User } from "@prisma/client";
 import { config } from "../config";
 import { randomToken, sha256Hex } from "../lib/crypto";
 import { db } from "../lib/db";
-import { ApiError, conflict, unauthorized } from "../lib/errors";
-import { decoyHash, hashPassword, verifyPassword } from "../lib/password";
+import { ApiError, unauthorized } from "../lib/errors";
+import { walletAuthUserId, type SupabaseUser } from "../lib/supabase-auth";
 import { createWalletChallenge, verifyWalletChallenge, type WalletChallenge } from "../lib/wallet-challenge";
 
 /**
- * Dashboard accounts, signed in three ways: email + password, a Stellar wallet
- * that signs a one-time SEP-53 challenge, or a Google/GitHub/... account
- * through Supabase Auth. Every way ends in an opaque bearer token (rds_...)
- * whose hash is stored.
+ * Dashboard accounts, signed in two ways: Supabase Auth (email + password,
+ * Google, GitHub, ...), or a Stellar wallet that signs a one-time SEP-53
+ * challenge. Either way ends in an opaque bearer token (rds_...) whose hash
+ * is stored.
  */
 
-export type SignInMethod = "password" | "wallet" | "oauth";
+export type SignInMethod = "supabase" | "wallet";
 export type SignedIn = { user: User; token: string; expiresAt: Date };
 
 const SESSION_PREFIX = "rds_";
@@ -21,32 +21,12 @@ export const isUserSessionToken = (v: string) => /^rds_[A-Za-z0-9_-]{20,}$/.test
 
 const challengeSecret = () => Buffer.from(config().ENCRYPTION_KEY, "base64");
 const isUniqueViolation = (e: unknown) => e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
-const invalidLogin = () => new ApiError(401, "invalid_login", "Email or password is incorrect.");
 
 async function startSession(user: User, method: SignInMethod): Promise<SignedIn> {
   const token = `${SESSION_PREFIX}${randomToken(32)}`;
   const expiresAt = new Date(Date.now() + config().USER_SESSION_DAYS * 86_400_000);
   await db().userSession.create({ data: { userId: user.id, tokenHash: sha256Hex(token), method, expiresAt } });
   return { user, token, expiresAt };
-}
-
-export async function signUp(email: string, password: string): Promise<SignedIn> {
-  const passwordHash = await hashPassword(password);
-  try {
-    const user = await db().user.create({ data: { email: email.toLowerCase(), passwordHash } });
-    return startSession(user, "password");
-  } catch (e) {
-    if (isUniqueViolation(e)) throw conflict("email_taken", "An account with this email already exists. Sign in instead.");
-    throw e;
-  }
-}
-
-export async function signIn(email: string, password: string): Promise<SignedIn> {
-  const user = await db().user.findUnique({ where: { email: email.toLowerCase() } });
-  // Hash something either way, so an unknown email takes as long as a wrong password.
-  const ok = await verifyPassword(password, user?.passwordHash ?? (await decoyHash()));
-  if (!user?.passwordHash || !ok) throw invalidLogin();
-  return startSession(user, "password");
 }
 
 export const walletChallenge = (address: string): WalletChallenge => createWalletChallenge(address, challengeSecret());
@@ -59,31 +39,57 @@ export async function walletSignIn(address: string, token: string, signature: st
       ? new ApiError(401, "challenge_expired", "The sign-in request expired. Connect your wallet again.")
       : new ApiError(401, "invalid_signature", "The wallet signature could not be verified.");
   }
+  const user = await linkWalletAuthUser(await walletUser(address));
+  return startSession(user, "wallet");
+}
+
+async function walletUser(address: string): Promise<User> {
   const existing = await db().user.findUnique({ where: { walletAddress: address } });
-  if (existing) return startSession(existing, "wallet");
+  if (existing) return existing;
   try {
-    return startSession(await db().user.create({ data: { walletAddress: address } }), "wallet");
+    return await db().user.create({ data: { walletAddress: address } });
   } catch (e) {
     // Two tabs signing in with the same new wallet: the other one created it.
     if (!isUniqueViolation(e)) throw e;
-    return startSession(await db().user.findUniqueOrThrow({ where: { walletAddress: address } }), "wallet");
+    return db().user.findUniqueOrThrow({ where: { walletAddress: address } });
   }
 }
 
 /**
- * Signs in the account for a provider-verified email, creating it on first
- * use. An existing email + password account with the same address is the same
- * person (the provider confirmed they own it), so they share one account.
+ * Gives a wallet account its Supabase Auth user (and UID) the first time it
+ * signs in. Best effort: if Supabase is down the sign-in still works, and the
+ * next one tries again.
  */
-export async function oauthSignIn(email: string): Promise<SignedIn> {
-  const address = email.toLowerCase();
-  const existing = await db().user.findUnique({ where: { email: address } });
-  if (existing) return startSession(existing, "oauth");
+async function linkWalletAuthUser(user: User): Promise<User> {
+  if (user.authUserId || !user.walletAddress) return user;
   try {
-    return startSession(await db().user.create({ data: { email: address } }), "oauth");
+    const authUserId = await walletAuthUserId(user.walletAddress);
+    if (!authUserId) return user;
+    return await db().user.update({ where: { id: user.id }, data: { authUserId } });
+  } catch (e) {
+    console.error(`[accounts] couldn't create the Supabase Auth user for wallet ${user.walletAddress}`, e);
+    return user;
+  }
+}
+
+/**
+ * Signs in the Rampart account for a Supabase Auth user, creating it on first
+ * use. Linked by Supabase's user id, so a changed email stays the same account.
+ */
+export async function supabaseSignIn(authUser: SupabaseUser): Promise<SignedIn> {
+  const linked = await db().user.findUnique({ where: { authUserId: authUser.id } });
+  if (linked) {
+    const user = linked.email === authUser.email ? linked : await db().user.update({ where: { id: linked.id }, data: { email: authUser.email } });
+    return startSession(user, "supabase");
+  }
+  try {
+    return startSession(await db().user.create({ data: { authUserId: authUser.id, email: authUser.email } }), "supabase");
   } catch (e) {
     if (!isUniqueViolation(e)) throw e;
-    return startSession(await db().user.findUniqueOrThrow({ where: { email: address } }), "oauth");
+    // Two tabs finishing the same first sign-in: the other one created it.
+    const user = await db().user.findUnique({ where: { authUserId: authUser.id } });
+    if (user) return startSession(user, "supabase");
+    throw new ApiError(409, "email_taken", "Another account already uses this email address.");
   }
 }
 

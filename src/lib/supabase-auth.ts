@@ -2,43 +2,76 @@ import { config } from "../config";
 import { ApiError } from "./errors";
 
 /**
- * Supabase Auth runs the Google/GitHub/... sign-in and hands the browser a
- * one-time PKCE code. Trading the code (with the verifier only that browser
- * has) for a Supabase session gives us the provider-confirmed email. Supabase
- * Auth's own session is then dropped: the dashboard uses Rampart's rds_ token.
+ * Supabase Auth signs people in (email + password, Google, GitHub, ...) and
+ * gives the browser an access token. Asking Supabase who that token belongs
+ * to is the check: it fails for an expired, revoked or forged token.
  */
 
-export type OAuthIdentity = { email: string; provider: string };
+export type SupabaseUser = { id: string; email: string };
 
-type SupabaseSession = {
-  user?: { email?: string | null; email_confirmed_at?: string | null; app_metadata?: { provider?: string } };
-};
+type UserResponse = { id?: string; email?: string | null; email_confirmed_at?: string | null };
 
-const failed = () => new ApiError(401, "oauth_failed", "That sign-in didn't go through. Try again.");
-
-export async function exchangeOAuthCode(code: string, codeVerifier: string): Promise<OAuthIdentity> {
+export async function supabaseUser(accessToken: string): Promise<SupabaseUser> {
   const cfg = config();
   if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
-    throw new ApiError(503, "oauth_unavailable", "Sign-in with Google or GitHub isn't set up on this server.");
+    throw new ApiError(503, "auth_unavailable", "Email sign-in isn't set up on this server.");
   }
   let res: Response;
   try {
-    res = await fetch(`${cfg.SUPABASE_URL.replace(/\/+$/, "")}/auth/v1/token?grant_type=pkce`, {
-      method: "POST",
-      headers: { apikey: cfg.SUPABASE_ANON_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
+    res = await fetch(`${cfg.SUPABASE_URL.replace(/\/+$/, "")}/auth/v1/user`, {
+      headers: { apikey: cfg.SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` },
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
-    throw new ApiError(502, "oauth_upstream", "Couldn't reach the sign-in service. Try again.");
+    throw new ApiError(502, "auth_upstream", "Couldn't reach the sign-in service. Try again.");
   }
-  // 4xx: a used, expired or forged code, or the wrong verifier.
-  if (res.status >= 400 && res.status < 500) throw failed();
-  if (!res.ok) throw new ApiError(502, "oauth_upstream", "The sign-in service had a problem. Try again.");
-  const user = ((await res.json().catch(() => ({}))) as SupabaseSession).user;
-  if (!user) throw failed();
+  if (res.status >= 400 && res.status < 500) throw new ApiError(401, "invalid_login", "Your sign-in expired. Sign in again.");
+  if (!res.ok) throw new ApiError(502, "auth_upstream", "The sign-in service had a problem. Try again.");
+  const user = (await res.json().catch(() => ({}))) as UserResponse;
+  if (!user.id) throw new ApiError(401, "invalid_login", "Your sign-in expired. Sign in again.");
   if (!user.email || !user.email_confirmed_at) {
-    throw new ApiError(401, "oauth_no_email", "That account has no confirmed email address. Use one that does, or sign up with email.");
+    throw new ApiError(403, "email_unconfirmed", "Confirm your email address first, using the link we sent you.");
   }
-  return { email: user.email, provider: user.app_metadata?.provider ?? "unknown" };
+  return { id: user.id, email: user.email.toLowerCase() };
+}
+
+type AdminUser = { id?: string; email?: string };
+
+/**
+ * The Supabase Auth user standing for a Stellar wallet, created on first use
+ * with the server's service-role key. Supabase Auth has no Stellar sign-in, so
+ * it gets a placeholder email (G...@<WALLET_EMAIL_DOMAIN>, confirmed, never
+ * mailed) and the address in its metadata. Null when the key isn't set.
+ */
+export async function walletAuthUserId(address: string): Promise<string | null> {
+  const cfg = config();
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const base = `${cfg.SUPABASE_URL.replace(/\/+$/, "")}/auth/v1/admin/users`;
+  const headers = { apikey: cfg.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${cfg.SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "application/json" };
+  const email = `${address.toLowerCase()}@${cfg.WALLET_EMAIL_DOMAIN}`;
+  const created = await fetch(base, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      email,
+      email_confirm: true,
+      app_metadata: { provider: "stellar", providers: ["stellar"], wallet_address: address },
+      user_metadata: { wallet_address: address },
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (created.ok) {
+    const user = (await created.json()) as AdminUser;
+    if (user.id) return user.id;
+  }
+  // Already there (an earlier sign-in that didn't finish linking): find it.
+  if (created.status === 422) {
+    const found = await fetch(`${base}?filter=${encodeURIComponent(email)}&per_page=10`, { headers, signal: AbortSignal.timeout(10_000) });
+    if (found.ok) {
+      const { users = [] } = (await found.json()) as { users?: AdminUser[] };
+      const user = users.find((u) => u.email === email);
+      if (user?.id) return user.id;
+    }
+  }
+  throw new Error(`Supabase admin returned ${created.status}`);
 }

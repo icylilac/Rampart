@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@stellar/freighter-api": "^6.0.1",
+    "@supabase/supabase-js": "^2.119.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

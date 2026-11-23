@@ -51,6 +51,13 @@ const baseSchema = z.object({
    */
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_ANON_KEY: optional,
+  /**
+   * Server-only. Lets wallet sign-ins get a Supabase Auth user too, so every
+   * account has a Supabase UID. Never send it to the browser.
+   */
+  SUPABASE_SERVICE_ROLE_KEY: optional,
+  /** Domain for the placeholder email of a wallet's Supabase user; nothing is ever sent to it. */
+  WALLET_EMAIL_DOMAIN: z.string().trim().min(1).default("wallet.rampartpay.xyz"),
   /** Set to "true" behind a reverse proxy so client IPs come from X-Forwarded-For. */
   TRUST_PROXY: z
     .string()
@@ -105,6 +112,10 @@ export const configSchema = baseSchema
   .refine((c) => Boolean(c.SUPABASE_URL) === Boolean(c.SUPABASE_ANON_KEY), {
     message: "Set both SUPABASE_URL and SUPABASE_ANON_KEY, or neither",
     path: ["SUPABASE_URL"],
+  })
+  .refine((c) => !c.SUPABASE_SERVICE_ROLE_KEY || Boolean(c.SUPABASE_URL), {
+    message: "SUPABASE_SERVICE_ROLE_KEY needs SUPABASE_URL",
+    path: ["SUPABASE_SERVICE_ROLE_KEY"],
   });
 
 export type Config = z.infer<typeof configSchema>;

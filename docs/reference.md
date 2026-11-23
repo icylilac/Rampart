@@ -252,14 +252,23 @@ and retried with backoff (30 s up to 12 h, 9 attempts). The SDK's
 ## Dashboard and accounts
 
 The site (`site/`) has sign-in, sign-up and a dashboard where users create
-projects and manage their API keys. There are two ways in:
+projects and manage their API keys. Every account is a **Supabase Auth** user,
+so all of them appear under Authentication → Users, with Rampart's own row in
+the `users` table linked by `auth_user_id`. There are two ways in:
 
-1. **Email + password.** Passwords are hashed with scrypt; a wrong password and
-   an unknown email get the same answer and take the same time.
-2. **Or a Stellar wallet.** The API issues a one-time challenge
-   (stateless, HMAC-signed, valid 5 minutes), Freighter signs it with SEP-53
-   (no transaction, no fee), and the API verifies the signature against the
-   address. The first wallet sign-in creates the account.
+1. **Supabase Auth: email + password, Google or GitHub.** The site signs in
+   with supabase-js (PKCE; new email accounts confirm by email first), then
+   sends the Supabase access token to `POST /v1/auth/supabase`. The API asks
+   Supabase whose token it is, then signs in that user's account, creating it
+   on first use. The Supabase session in the browser is then dropped.
+2. **Or a Stellar wallet** (Varial, formerly Freighter). The API issues a
+   one-time challenge (stateless, HMAC-signed, valid 5 minutes), the wallet
+   signs it with SEP-53 (no transaction, no fee), and the API verifies the
+   signature against the address. Supabase Auth has no Stellar sign-in, so on
+   the wallet's first sign-in the API creates its Supabase user itself with the
+   service-role key: placeholder email `g...@wallet.rampartpay.xyz` (confirmed,
+   never mailed) and the address in its metadata. If Supabase is down the
+   sign-in still works and the next one links it.
 
 Either way the API returns a session token (`rds_...`, 30 days by default)
 that the dashboard sends as `Authorization: Bearer`. Only its SHA-256 is
@@ -267,12 +276,10 @@ stored, and signing out revokes it.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/v1/auth/signup` | Create an account (`email`, `password` of 10+ characters) and sign in |
-| `POST` | `/v1/auth/login` | Sign in with email and password |
+| `POST` | `/v1/auth/supabase` | Sign in with a Supabase Auth access token (`access_token`) |
 | `POST` | `/v1/auth/wallet/challenge` | Message for the wallet to sign (`address`) |
 | `POST` | `/v1/auth/wallet` | Sign in with the signed challenge (`address`, `token`, `signature`) |
-| `POST` | `/v1/auth/oauth` | Sign in with Google, GitHub, ... through Supabase Auth (`code`, `code_verifier`) |
-| `GET` | `/v1/auth/me` | The signed-in user |
+| `GET` | `/v1/auth/me` | The signed-in user, with its `supabase_user_id` |
 | `POST` | `/v1/auth/logout` | End the session |
 | `GET` | `/v1/dashboard/projects` | The user's projects and their keys (prefixes only) |
 | `POST` | `/v1/dashboard/projects` | New project (`name`, optional `webhook_url`); returns the live key, test key and webhook secret once |
@@ -283,21 +290,16 @@ Projects made with `npm run project:create` have no owner and don't appear in
 anyone's dashboard. The site calls the API set in `VITE_RAMPART_API_URL` at
 build time (default `http://localhost:8080`).
 
-**Google, GitHub and other providers** go through Supabase Auth with PKCE. The
-site sends the person to Supabase, which sends them back to `/auth/callback`
-with a one-time code; the API trades the code and verifier with Supabase for
-the provider-confirmed email, then signs in that email's account (creating it,
-or joining an email + password account with the same address). To turn it on:
+To set up Supabase Auth:
 
-1. In Supabase, under **Authentication → Sign In / Providers**, enable each
-   provider with its OAuth client ID and secret. The provider's callback URL is
+1. **API:** `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`
+   (server only; it's what creates wallet users). **Site:** `VITE_SUPABASE_URL`
+   and `VITE_SUPABASE_ANON_KEY`. Without them only wallets can sign in.
+2. **Authentication → URL Configuration:** the site URL, and
+   `https://<site>/auth/callback` in the redirect URLs.
+3. **Authentication → Sign In / Providers:** Email is on by default. For Google
+   and GitHub, add each one's OAuth client ID and secret; their callback URL is
    `https://<ref>.supabase.co/auth/v1/callback`.
-2. Under **Authentication → URL Configuration**, add the site's
-   `https://<site>/auth/callback` to the redirect URLs.
-3. Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` on the API, and
-   `VITE_SUPABASE_URL` on the site. Without it the buttons don't show.
-
-Accounts live in Rampart's own `users` table, not in Supabase Auth's user list.
 
 ## Test mode and the sandbox
 
@@ -658,7 +660,7 @@ All settings are environment variables validated at startup ([`src/config.ts`](.
 - [x] Reconciler worker (poll open sessions, expire stale ones, retry verification)
 - [x] Sandbox provider with failure scenarios (test mode)
 - [x] `@rampart/sdk` SDK: server client, webhook verification, browser `next_action` runner
-- [x] Dashboard: email + password or Freighter wallet sign-in, projects and API keys
+- [x] Dashboard: Supabase Auth (email + password, Google, GitHub) or wallet sign-in, projects and API keys
 - [x] Docker image and docker-compose for self-hosting
 - [x] Unit, integration and SDK end-to-end tests; CI
 - [x] `ramp-receipts` Soroban contract: on-chain receipts of verified deliveries (testnet)

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { api, setToken, type SignedIn } from "../lib/api";
-import { finishOAuth, OAUTH_PROVIDERS, startOAuth, type OAuthProvider } from "../lib/oauth";
 import { Link, navigate, withNext } from "../lib/router";
+import { emailSignIn, emailSignUp, finishCallback, OAUTH_PROVIDERS, oauthSignIn, SUPABASE_READY, type OAuthProvider } from "../lib/supabase";
 import { walletSignIn } from "../lib/wallet";
 import { Icon } from "./Icon";
 
@@ -42,13 +41,14 @@ export function AuthSwitch({ prompt, to, label }: { prompt: string; to: string; 
   );
 }
 
-/** Email + password, against the Rampart API. */
+/** Email + password, on Supabase Auth. */
 export function EmailForm({ mode, next }: { mode: "sign-in" | "sign-up"; next: string }) {
   const signUp = mode === "sign-up";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -58,13 +58,28 @@ export function EmailForm({ mode, next }: { mode: "sign-in" | "sign-up"; next: s
     if (!password) return setError("Enter your password.");
     setBusy(true);
     try {
-      const session = await api<SignedIn>(signUp ? "/v1/auth/signup" : "/v1/auth/login", { body: { email: email.trim(), password } });
-      setToken(session.token);
+      if (signUp) {
+        if ((await emailSignUp(email.trim(), password)) === "confirm") {
+          setSentTo(email.trim());
+          setBusy(false);
+          return;
+        }
+      } else {
+        await emailSignIn(email.trim(), password);
+      }
       navigate(next, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
       setBusy(false);
     }
+  }
+
+  if (sentTo) {
+    return (
+      <p role="status" className="form-notice">
+        We sent a confirmation link to <strong>{sentTo}</strong>. Open it in this browser to finish signing up.
+      </p>
+    );
   }
 
   return (
@@ -99,17 +114,17 @@ export function EmailForm({ mode, next }: { mode: "sign-in" | "sign-up"; next: s
   );
 }
 
-/** Google, GitHub, ...: above email, since it's the fastest way in. Hidden when the site isn't set up for it. */
+/** Google, GitHub, ... on Supabase Auth: above email, since it's the fastest way in. */
 export function OAuthButtons({ next }: { next: string }) {
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
-  if (OAUTH_PROVIDERS.length === 0) return null;
+  if (!SUPABASE_READY) return null;
 
   async function go(provider: OAuthProvider) {
     setBusy(provider);
     setError(null);
     try {
-      await startOAuth(provider, next);
+      await oauthSignIn(provider, next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start the sign-in.");
       setBusy(null);
@@ -140,7 +155,7 @@ export function OAuthButtons({ next }: { next: string }) {
   );
 }
 
-/** Where Supabase Auth sends people back to: trade the code, then go on. */
+/** Where Supabase Auth sends people back to, from Google/GitHub or an email confirmation link. */
 export function OAuthCallbackPage() {
   const [error, setError] = useState<string | null>(null);
   // The code works once; StrictMode runs effects twice in development.
@@ -148,7 +163,7 @@ export function OAuthCallbackPage() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    finishOAuth()
+    finishCallback()
       .then((next) => navigate(next, { replace: true }))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "That sign-in didn't go through."));
   }, []);

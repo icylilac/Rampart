@@ -57,7 +57,7 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   return data as T;
 }
 
-export type User = { id: string; email: string | null; wallet_address: string | null; created_at: string };
+export type User = { id: string; email: string | null; wallet_address: string | null; supabase_user_id: string | null; created_at: string };
 export type SignedIn = { token: string; expires_at: string; user: User };
 export type ApiKey = { id: string; mode: "live" | "test"; prefix: string; created_at: string; revoked_at: string | null };
 export type Project = { id: string; name: string; webhook_url: string | null; created_at: string; api_keys: ApiKey[] };

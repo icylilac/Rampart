@@ -1,29 +1,13 @@
-import { randomUUID } from "node:crypto";
 import { Keypair } from "@stellar/stellar-sdk";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildServer } from "../src/app";
 import { db } from "../src/lib/db";
-import { hashPassword, verifyPassword } from "../src/lib/password";
 import { CHALLENGE_TTL_MS, createWalletChallenge, verifyWalletChallenge } from "../src/lib/wallet-challenge";
 
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
-const uniqueEmail = () => `dev-${randomUUID().slice(0, 8)}@Example.com`;
-const PASSWORD = "correct horse battery";
 /** SEP-53 signature, base64, as a wallet returns it. */
 const sign = (kp: Keypair, message: string) => Buffer.from(kp.signMessage(message)).toString("base64");
-
-describe("passwords", () => {
-  it("hashes with a fresh salt and verifies only the right password", async () => {
-    const a = await hashPassword(PASSWORD);
-    const b = await hashPassword(PASSWORD);
-    expect(a).toMatch(/^scrypt\$32768\$8\$1\$/);
-    expect(a).not.toBe(b);
-    expect(await verifyPassword(PASSWORD, a)).toBe(true);
-    expect(await verifyPassword("correct horse battery!", a)).toBe(false);
-    expect(await verifyPassword(PASSWORD, "not-a-hash")).toBe(false);
-  });
-});
 
 describe("wallet challenges", () => {
   const secret = Buffer.alloc(32, 7);
@@ -68,12 +52,6 @@ describe("dashboard API", () => {
     await app.close();
   });
 
-  const signUp = async (email = uniqueEmail()) => {
-    const res = await app.inject({ method: "POST", url: "/v1/auth/signup", payload: { email, password: PASSWORD } });
-    expect(res.statusCode).toBe(201);
-    return res.json() as { token: string; user: { id: string; email: string } };
-  };
-
   const walletSignIn = async (kp: Keypair) => {
     const c = await app.inject({ method: "POST", url: "/v1/auth/wallet/challenge", payload: { address: kp.publicKey() } });
     expect(c.statusCode).toBe(200);
@@ -85,39 +63,12 @@ describe("dashboard API", () => {
     });
   };
 
-  it("signs up, signs in with the same email in any case, and refuses a duplicate", async () => {
-    const email = uniqueEmail();
-    const created = await signUp(email);
-    expect(created.token).toMatch(/^rds_/);
-    expect(created.user.email).toBe(email.toLowerCase());
-
-    const dup = await app.inject({ method: "POST", url: "/v1/auth/signup", payload: { email: email.toUpperCase(), password: PASSWORD } });
-    expect(dup.statusCode).toBe(409);
-    expect(dup.json().error.code).toBe("email_taken");
-
-    const login = await app.inject({ method: "POST", url: "/v1/auth/login", payload: { email: email.toUpperCase(), password: PASSWORD } });
-    expect(login.statusCode).toBe(200);
-    expect(login.json().user.id).toBe(created.user.id);
-
-    const me = await app.inject({ url: "/v1/auth/me", headers: bearer(login.json().token) });
-    expect(me.json()).toMatchObject({ object: "user", id: created.user.id, email: email.toLowerCase(), wallet_address: null });
-  });
-
-  it("gives the same answer for a wrong password and an unknown email", async () => {
-    const { user } = await signUp();
-    const wrong = await app.inject({ method: "POST", url: "/v1/auth/login", payload: { email: user.email, password: "nope nope nope" } });
-    const unknown = await app.inject({ method: "POST", url: "/v1/auth/login", payload: { email: uniqueEmail(), password: PASSWORD } });
-    expect(wrong.statusCode).toBe(401);
-    expect(unknown.statusCode).toBe(401);
-    expect(wrong.json()).toEqual(unknown.json());
-  });
-
-  it("rejects short passwords and bad emails", async () => {
-    const short = await app.inject({ method: "POST", url: "/v1/auth/signup", payload: { email: uniqueEmail(), password: "short" } });
-    expect(short.statusCode).toBe(400);
-    const bad = await app.inject({ method: "POST", url: "/v1/auth/signup", payload: { email: "not-an-email", password: PASSWORD } });
-    expect(bad.statusCode).toBe(400);
-  });
+  /** A new wallet account, signed in. */
+  const signUp = async () => {
+    const res = await walletSignIn(Keypair.random());
+    expect(res.statusCode).toBe(200);
+    return res.json() as { token: string; user: { id: string } };
+  };
 
   it("ends the session on sign-out", async () => {
     const { token } = await signUp();

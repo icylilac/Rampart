@@ -39,13 +39,14 @@ describe("hardening", () => {
 
   it("limits sign-in attempts per IP more tightly than the API", async () => {
     const attempt = () =>
-      app.inject({ method: "POST", url: "/v1/auth/login", remoteAddress: "203.0.113.9", payload: { email: "guess@example.com", password: "guess guess guess" } });
+      app.inject({ method: "POST", url: "/v1/auth/supabase", remoteAddress: "203.0.113.9", payload: { access_token: "guess" } });
     const codes = [];
     for (let i = 0; i < 4; i++) codes.push((await attempt()).statusCode);
-    expect(codes).toEqual([401, 401, 401, 429]);
+    // 503: this test server has no Supabase set up; the limit applies first either way.
+    expect(codes).toEqual([503, 503, 503, 429]);
     // Another IP still gets its own attempts.
-    const other = await app.inject({ method: "POST", url: "/v1/auth/login", remoteAddress: "203.0.113.10", payload: { email: "x@example.com", password: "guess guess guess" } });
-    expect(other.statusCode).toBe(401);
+    const other = await app.inject({ method: "POST", url: "/v1/auth/supabase", remoteAddress: "203.0.113.10", payload: { access_token: "guess" } });
+    expect(other.statusCode).toBe(503);
   });
 
   it("rate-limits per key, separately from other callers, but never health checks", async () => {
@@ -88,13 +89,12 @@ describe("hardening", () => {
   });
 
   it("won't save a webhook URL that points at an internal address", async () => {
-    const signup = await app.inject({
-      method: "POST",
-      url: "/v1/auth/signup",
-      remoteAddress: "203.0.113.20",
-      payload: { email: `ssrf-${Date.now()}@example.com`, password: "a long enough password" },
-    });
-    const headers = auth(signup.json().token);
+    const kp = Keypair.random();
+    const challenge = await app.inject({ method: "POST", url: "/v1/auth/wallet/challenge", remoteAddress: "203.0.113.20", payload: { address: kp.publicKey() } });
+    const { message, token } = challenge.json();
+    const signature = Buffer.from(kp.signMessage(message)).toString("base64");
+    const signIn = await app.inject({ method: "POST", url: "/v1/auth/wallet", remoteAddress: "203.0.113.20", payload: { address: kp.publicKey(), token, signature } });
+    const headers = auth(signIn.json().token);
     for (const webhook_url of ["https://169.254.169.254/latest/meta-data/", "https://10.0.0.5/hooks", "http://localhost:3000/hooks", "https://[::1]/"]) {
       const res = await app.inject({ method: "POST", url: "/v1/dashboard/projects", headers, payload: { name: "SSRF", webhook_url } });
       expect(res.statusCode, webhook_url).toBe(400);

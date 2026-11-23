@@ -13,7 +13,7 @@ describe("Vercel entry point", () => {
       expect(health.status).toBe(200);
       expect(await health.json()).toMatchObject({ status: "ok" });
 
-      const preflight = await fetch(`http://127.0.0.1:${port}/v1/auth/login`, { method: "OPTIONS" });
+      const preflight = await fetch(`http://127.0.0.1:${port}/v1/auth/supabase`, { method: "OPTIONS" });
       expect(preflight.status).toBe(204);
       expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
     } finally {

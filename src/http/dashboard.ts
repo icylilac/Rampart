@@ -2,8 +2,8 @@ import type { ApiKey, Project, User } from "@prisma/client";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { config } from "../config";
-import { oauthSignIn, signIn, signOut, signUp, walletChallenge, walletSignIn, type SignedIn } from "../engine/accounts";
-import { exchangeOAuthCode } from "../lib/supabase-auth";
+import { signOut, supabaseSignIn, walletChallenge, walletSignIn, type SignedIn } from "../engine/accounts";
+import { supabaseUser } from "../lib/supabase-auth";
 import { addApiKey, createProject } from "../engine/projects";
 import { db } from "../lib/db";
 import { ApiError, notFound } from "../lib/errors";
@@ -12,8 +12,8 @@ import { webhookUrlProblem } from "../lib/webhook-target";
 import { requireUser } from "./auth";
 
 /**
- * Dashboard API: sign-up and sign-in (email + password, a Stellar wallet, or
- * Google/GitHub/... through Supabase Auth),
+ * Dashboard API: sign-in (Supabase Auth: email + password, Google, GitHub,
+ * ...; or a Stellar wallet),
  * then projects and API keys for the signed-in user. The browser holds an
  * rds_ bearer token; no cookies, so CORS stays simple.
  */
@@ -21,16 +21,10 @@ import { requireUser } from "./auth";
 const MAX_PROJECTS_PER_USER = 25;
 const MAX_ACTIVE_KEYS_PER_PROJECT = 20;
 
-const email = z.string().trim().toLowerCase().email("Enter a valid email address.").max(254);
-const credentials = z.object({ email, password: z.string().min(1).max(200) }).strict();
-const signUpBody = z
-  .object({ email, password: z.string().min(10, "Use at least 10 characters.").max(200, "Use at most 200 characters.") })
-  .strict();
 const address = z.string().trim().refine(isStellarAddress, "Enter a Stellar account address (G...).");
 const challengeBody = z.object({ address }).strict();
 const walletBody = z.object({ address, token: z.string().min(1).max(1000), signature: z.string().min(1).max(200) }).strict();
-// PKCE: the verifier is 43-128 URL-safe characters (RFC 7636).
-const oauthBody = z.object({ code: z.string().min(1).max(500), code_verifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/) }).strict();
+const supabaseBody = z.object({ access_token: z.string().min(1).max(4000) }).strict();
 
 const keyBody = z.object({ mode: z.enum(["live", "test"]) }).strict();
 const projectParams = z.object({ id: z.string().uuid() });
@@ -41,6 +35,7 @@ const serializeUser = (u: User) => ({
   id: u.id,
   email: u.email,
   wallet_address: u.walletAddress,
+  supabase_user_id: u.authUserId,
   created_at: u.createdAt.toISOString(),
 });
 
@@ -83,21 +78,17 @@ export function dashboardRoutes(app: FastifyInstance) {
       if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
     });
   const projectBody = z.object({ name: z.string().trim().min(1).max(80), webhook_url: webhookUrl.nullish() }).strict();
-  // Sign-in endpoints get their own, tighter per-IP budget against password guessing.
+  // Sign-in endpoints get their own, tighter per-IP budget.
   const authLimit =
     cfg.AUTH_RATE_LIMIT_PER_MINUTE > 0
       ? { config: { rateLimit: { max: cfg.AUTH_RATE_LIMIT_PER_MINUTE, timeWindow: "1 minute", keyGenerator: (r: FastifyRequest) => `auth:${r.ip}` } } }
       : {};
 
   // ---------------------------------------------------------------- auth
-  app.post("/v1/auth/signup", authLimit, async (request, reply) => {
-    const b = signUpBody.parse(request.body);
-    return reply.status(201).send(serializeSignIn(await signUp(b.email, b.password)));
-  });
-
-  app.post("/v1/auth/login", authLimit, async (request) => {
-    const b = credentials.parse(request.body);
-    return serializeSignIn(await signIn(b.email, b.password));
+  // The site signs in with Supabase Auth, then trades its access token for an rds_ session.
+  app.post("/v1/auth/supabase", authLimit, async (request) => {
+    const b = supabaseBody.parse(request.body);
+    return serializeSignIn(await supabaseSignIn(await supabaseUser(b.access_token)));
   });
 
   app.post("/v1/auth/wallet/challenge", authLimit, async (request, reply) => {
@@ -109,14 +100,6 @@ export function dashboardRoutes(app: FastifyInstance) {
   app.post("/v1/auth/wallet", authLimit, async (request) => {
     const b = walletBody.parse(request.body);
     return serializeSignIn(await walletSignIn(b.address, b.token, b.signature));
-  });
-
-  // The site sends the person to Supabase Auth, which sends them back with a
-  // one-time code; trading it here (with the PKCE verifier) proves the email.
-  app.post("/v1/auth/oauth", authLimit, async (request) => {
-    const b = oauthBody.parse(request.body);
-    const identity = await exchangeOAuthCode(b.code, b.code_verifier);
-    return serializeSignIn(await oauthSignIn(identity.email));
   });
 
   app.get("/v1/auth/me", async (request) => serializeUser((await requireUser(request)).user));

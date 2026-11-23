@@ -64,6 +64,12 @@ const baseSchema = z.object({
     .optional()
     .transform((v) => v === "true"),
 
+  /**
+   * Turns on POST /internal/reconcile (one worker pass) for a scheduler to
+   * call with "Authorization: Bearer <CRON_SECRET>". At least 32 characters.
+   */
+  CRON_SECRET: z.string().trim().min(32).optional(),
+
   SESSION_TTL_MINUTES: z.coerce.number().int().positive().default(60),
   RECONCILE_INTERVAL_SECONDS: z.coerce.number().int().positive().default(30),
 

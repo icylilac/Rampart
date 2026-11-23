@@ -5,8 +5,8 @@ import { buildServer } from "./app";
  * The API as one Vercel function. scripts/vercel-build.sh bundles this file
  * (dependencies included) into dist-vercel/handler.js, api/index.js loads it,
  * and vercel.json rewrites every path there for Fastify to route as usual.
- * Only the HTTP API runs on Vercel; the reconciler and webhook delivery need
- * a long-running `npm run worker`.
+ * Only the HTTP API runs on Vercel; the worker runs one pass a minute when a
+ * scheduler calls POST /internal/reconcile (docs/reference.md).
  */
 const app = buildServer();
 const ready = app.ready();

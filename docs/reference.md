@@ -530,12 +530,26 @@ Postgres database, both on free plans:
   pooler (port 5432), which migrations need. The direct `db.<ref>.supabase.co`
   host is IPv6-only, so Vercel builds can't reach it. Keep `regions` in
   `vercel.json` next to the Supabase project's region.
-- Environment: `DATABASE_URL`, `DIRECT_URL`, `ENCRYPTION_KEY`, `PUBLIC_BASE_URL`, `TRUST_PROXY=true`,
+- Environment: `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `ENCRYPTION_KEY`, `PUBLIC_BASE_URL`, `TRUST_PROXY=true`,
   `WORKER_IN_PROCESS=false` and `NODEJS_HELPERS=0`. The site's Vercel project
   sets `VITE_RAMPART_API_URL` to the API's URL.
-- Only the HTTP API runs there. The reconciler and outbound webhook retries
-  need a long-running `npm run worker` (the Docker image, for example) pointed
-  at the same database.
+- Only the HTTP API runs there, so the worker (sandbox steps, polling,
+  expiry, verification, webhook delivery) runs one pass per minute instead:
+  Supabase's `pg_cron` calls `POST /internal/reconcile` through `pg_net` with
+  `Authorization: Bearer <CRON_SECRET>`. Without `CRON_SECRET` set the
+  endpoint answers 404. A long-running `npm run worker` against the same
+  database does the same job every 2 seconds, if you'd rather run one.
+
+  ```sql
+  create extension if not exists pg_cron;
+  create extension if not exists pg_net;
+  select cron.schedule('rampart-reconcile', '* * * * *', $$
+    select net.http_post(
+      url := 'https://rampart-api.vercel.app/internal/reconcile',
+      headers := jsonb_build_object('Authorization', 'Bearer <CRON_SECRET>'),
+      timeout_milliseconds := 25000)
+  $$);
+  ```
 
 ## Scripts
 

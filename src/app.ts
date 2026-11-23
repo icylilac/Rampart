@@ -18,7 +18,8 @@ import {
 import { requireApiKey, requireClientSecret } from "./http/auth";
 import { dashboardRoutes } from "./http/dashboard";
 import { sandboxCheckoutPage } from "./http/sandbox-page";
-import { sha256Hex } from "./lib/crypto";
+import { reconcileOnce } from "./engine/reconciler";
+import { safeEqual, sha256Hex } from "./lib/crypto";
 import { ApiError, badRequest } from "./lib/errors";
 import { allProviders, provider as providerFor, sandbox } from "./providers/registry";
 import { SCENARIO_DESCRIPTIONS, SCENARIOS } from "./providers/sandbox";
@@ -179,6 +180,18 @@ export function buildServer(): FastifyInstance {
   void app.register(async (app) => {
     // ---------------------------------------------------------------- public
     app.get("/health", async () => ({ status: "ok", network: config().STELLAR_NETWORK }));
+
+    // One worker pass, for hosts with no long-running worker (Vercel): a
+    // scheduler calls it every minute with CRON_SECRET. Passes may overlap;
+    // the worker is safe to run more than once at a time.
+    app.post("/internal/reconcile", async (request, reply) => {
+      const secret = config().CRON_SECRET;
+      const given = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "")?.[1];
+      if (!secret || !given || !safeEqual(given, secret)) return reply.status(404).send({ error: { code: "not_found", message: "Not found." } });
+      const started = Date.now();
+      await reconcileOnce();
+      return { ok: true, ms: Date.now() - started };
+    });
 
     app.get("/v1/providers", async () => ({
       network: config().STELLAR_NETWORK,

@@ -3,9 +3,10 @@
 set -e
 npx prisma generate
 # Only production deploys migrate: a PR preview must never change the live
-# database's schema. Migrations go over Neon's direct (unpooled) connection.
+# database's schema. Migrations need a session connection, not Supabase's
+# transaction pooler, so they go over DIRECT_URL when it is set.
 if [ "$VERCEL_ENV" = "production" ]; then
-  DATABASE_URL="${DATABASE_URL_UNPOOLED:-$DATABASE_URL}" npx prisma migrate deploy
+  DATABASE_URL="${DIRECT_URL:-$DATABASE_URL}" npx prisma migrate deploy
 fi
 # One CommonJS file with the dependencies inlined (see api/index.js). Prisma
 # stays external: its query engine is a native file Vercel traces and ships.

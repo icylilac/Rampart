@@ -498,15 +498,20 @@ webhook deliveries are claimed atomically.
 
 ### Hosting the API on Vercel
 
-The hosted API (`https://rampart-api.vercel.app`) runs on Vercel with a Neon
+The hosted API (`https://rampart-api.vercel.app`) runs on Vercel with a Supabase
 Postgres database, both on free plans:
 
 - `api/index.js` is the function; `vercel.json` sends every path to it. The
   build ([`scripts/vercel-build.sh`](../scripts/vercel-build.sh)) bundles
   `src/vercel.ts` with esbuild and, on production deploys only, runs
-  `prisma migrate deploy` over Neon's unpooled connection.
-- Environment: `DATABASE_URL` and `DATABASE_URL_UNPOOLED` (set by the Neon
-  integration), `ENCRYPTION_KEY`, `PUBLIC_BASE_URL`, `TRUST_PROXY=true`,
+  `prisma migrate deploy` over `DIRECT_URL`.
+- Database: from the Supabase project's **Connect** panel, `DATABASE_URL` is
+  the transaction pooler (port 6543) with `?pgbouncer=true&connection_limit=1`
+  appended, which serverless functions need; `DIRECT_URL` is the session
+  pooler (port 5432), which migrations need. The direct `db.<ref>.supabase.co`
+  host is IPv6-only, so Vercel builds can't reach it. Keep `regions` in
+  `vercel.json` next to the Supabase project's region.
+- Environment: `DATABASE_URL`, `DIRECT_URL`, `ENCRYPTION_KEY`, `PUBLIC_BASE_URL`, `TRUST_PROXY=true`,
   `WORKER_IN_PROCESS=false` and `NODEJS_HELPERS=0`. The site's Vercel project
   sets `VITE_RAMPART_API_URL` to the API's URL.
 - Only the HTTP API runs there. The reconciler and outbound webhook retries
